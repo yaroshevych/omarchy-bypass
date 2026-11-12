@@ -35,6 +35,9 @@ omarchy plugin add https://github.com/yaroshevych/omarchy-bypass.git --enable
 Open the Bypass icon in the bar. If Bypass is not installed, the widget offers to
 run the official installer.
 
+One widget instance is active at a time. If Omarchy creates the bar on multiple
+monitors, the widget appears on the first available bar.
+
 ## Remove
 
 ```sh

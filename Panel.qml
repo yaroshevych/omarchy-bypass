@@ -10,13 +10,30 @@ import qs.Ui
 import qs.Ui as Ui
 import qs.Commons
 import qs.Commons as Commons
+import "." as Plugin
 
 Panel {
   id: root
   moduleName: "bypass.vault"
   ipcTarget: "bypass.vault"
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  readonly property bool isOwner: Plugin.WidgetCoordinator.owner === root
+  visible: isOwner
+  implicitWidth: isOwner ? button.implicitWidth : 0
+  implicitHeight: isOwner ? button.implicitHeight : 0
+  Component.onCompleted: Plugin.WidgetCoordinator.attach(root)
+  Component.onDestruction: {
+    findBackend.running = false
+    installer.running = false
+    service.running = false
+    Plugin.WidgetCoordinator.detach(root)
+  }
+  onIsOwnerChanged: {
+    if (isOwner) {
+      backendPath = ""
+      screen = "checking"
+      findBackend.running = true
+    }
+  }
   property string screen: "checking"
   property string backendPath: ""
   property bool serviceReady: false
@@ -199,7 +216,6 @@ Panel {
   Process {
     id: findBackend
     command: ["sh", "-c", "if command -v bypass >/dev/null 2>&1; then command -v bypass; elif [ -x \"$HOME/.local/bin/bypass\" ]; then printf '%s\\n' \"$HOME/.local/bin/bypass\"; else exit 1; fi"]
-    running: true
     stdout: SplitParser { onRead: data => root.backendPath = data.trim() }
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0 && root.backendPath !== "") {
