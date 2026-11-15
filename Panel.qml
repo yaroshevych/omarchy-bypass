@@ -327,6 +327,7 @@ Panel {
     command: ["bash", "-o", "pipefail", "-c", "curl -fsSL https://raw.githubusercontent.com/yaroshevych/bypass/main/install.sh | bash"]
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0) {
+        registerMenu.running = true
         root.backendPath = ""
         root.screen = "checking"
         findBackend.running = true
@@ -335,6 +336,10 @@ Panel {
         root.errorText = strings.t("install.failed")
       }
     }
+  }
+  Process {
+    id: registerMenu
+    command: ["python3", decodeURIComponent(Qt.resolvedUrl("register-menu.py").toString().replace(/^file:\/\//, ""))]
   }
   Process {
     id: service
