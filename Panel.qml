@@ -174,7 +174,7 @@ Panel {
     }
     else if (result.action === "fields") {
       fields = (result.fields || []).filter(field => field.Name !== "Title")
-      itemGroup = fields.length > 0 && fields[0].Group ? fields[0].Group : ""
+      itemGroup = fields.length > 0 && fields[0].group ? fields[0].group : ""
       screen = "fields"
     }
     else if (result.action === "review") review = result
@@ -560,7 +560,7 @@ Panel {
               RowLayout {
                 Layout.fillWidth: true
                 BodyText { text: modelData.Name; color: Commons.Color.foreground; Layout.fillWidth: true }
-                PanelActionButton { iconText: "󰌷"; tooltipText: "Copy bypass://" + (fieldRow.modelData.Group ? fieldRow.modelData.Group + "/" : "") + root.itemTitle + "#" + fieldRow.modelData.Name; focusable: true; opacity: fieldHover.hovered || activeFocus ? 1 : 0; onClicked: root.send({action: "copy-reference", id: root.itemId, field: modelData.Name}) }
+                PanelActionButton { iconText: "󰌷"; tooltipText: "Copy bypass://" + (fieldRow.modelData.group ? fieldRow.modelData.group + "/" : "") + root.itemTitle + "#" + fieldRow.modelData.Name; focusable: true; opacity: fieldHover.hovered || activeFocus ? 1 : 0; onClicked: root.send({action: "copy-reference", id: root.itemId, field: modelData.Name}) }
               }
               RowLayout {
                 Layout.fillWidth: true
