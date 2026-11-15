@@ -47,6 +47,9 @@ Panel {
   property string recentQuery: ""
   readonly property var filteredRecent: recent.filter(path => path.toLowerCase().includes(recentQuery.toLowerCase().trim()))
   property var items: []
+  property var itemQueries: []
+  property int searchGeneration: 0
+  property int openSearchGeneration: -1
   property var fields: []
   property var requests: []
   property string requestId: ""
@@ -142,15 +145,25 @@ Panel {
       serviceReady = true
       if (screen === "checking") screen = "recent"
     }
+    if (result.action === "items") {
+      result.searchGeneration = itemQueries.shift()
+      if (result.searchGeneration !== searchGeneration || screen !== "items") return
+    }
     errorText = result.error || ""
-    if (result.error) return
+    if (result.error) { if (result.action === "items") openSearchGeneration = -1; return }
     if (result.action === "recent") {
       recent = result.recent || []
 
     }
-    else if (result.action === "open") { screen = "items"; focusSearchOnResults = true; send({action: "items", query: ""}) }
+    else if (result.action === "open") { screen = "items"; focusSearchOnResults = true; searchItems("") }
     else if (result.action === "items") {
+      const generation = result.searchGeneration
       items = result.items || []
+      if (openSearchGeneration === generation) {
+        openSearchGeneration = -1
+        if (items.length > 0) openItem(items[0])
+        return
+      }
       if (focusSearchOnResults) {
         focusSearchOnResults = false
         Qt.callLater(function() {
@@ -185,9 +198,20 @@ Panel {
     }
     return false
   }
-  Timer { id: searchTimer; interval: 120; repeat: false; onTriggered: root.send({action: "items", query: panel.loadedContent.queryField.text}) }
+  function searchItems(query) {
+    if (!service.running) { errorText = strings.t("service.unavailable"); return }
+    itemQueries.push(searchGeneration)
+    send({action: "items", query: query})
+  }
+  function acceptSearch() {
+    searchTimer.stop()
+    searchGeneration++
+    openSearchGeneration = searchGeneration
+    searchItems(panel.loadedContent.queryField.text)
+  }
+  Timer { id: searchTimer; interval: 120; repeat: false; onTriggered: root.searchItems(panel.loadedContent.queryField.text) }
   function showAllItems() {
-    if (panel.loadedContent) { searchTimer.stop(); panel.loadedContent.queryField.text = "*"; send({action: "items", query: "*"}) }
+    if (panel.loadedContent) { searchTimer.stop(); panel.loadedContent.queryField.text = "*"; searchTimer.stop(); searchItems("*") }
   }
   function moveList(list, index, direction) {
     if (!panel.loadedContent) return
@@ -247,7 +271,7 @@ Panel {
     stdout: SplitParser { onRead: data => root.handle(data) }
     onStarted: root.send({action: "recent"})
     onExited: {
-      root.items = []; root.fields = []
+      root.items = []; root.fields = []; root.itemQueries = []; root.openSearchGeneration = -1
       root.screen = "failed"
       root.errorText = root.serviceReady ? strings.t("service.stopped") : strings.t("service.incompatible")
       root.serviceReady = false
@@ -459,11 +483,11 @@ Panel {
               Layout.fillWidth: true
               Layout.minimumWidth: 0
               Layout.maximumHeight: implicitHeight
-              onTextChanged: searchTimer.restart()
+              onTextChanged: { root.searchGeneration++; root.openSearchGeneration = -1; searchTimer.restart() }
               Keys.onDownPressed: function(event) { root.moveList("items", -1, 1); event.accepted = true }
               Keys.onUpPressed: function(event) { root.moveList("items", -1, -1); event.accepted = true }
               Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
-              onAccepted: if (root.items.length > 0) root.openItem(root.items[0])
+              onAccepted: root.acceptSearch()
             }
             WideButton {
               id: fieldsBackButton
