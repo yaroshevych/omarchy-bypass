@@ -37,6 +37,7 @@ Panel {
   property string screen: "checking"
   property string backendPath: ""
   property bool serviceReady: false
+  property string restartVaultPath: ""
   property string vaultPath: ""
   property string itemId: ""
   property string itemTitle: ""
@@ -135,7 +136,7 @@ Panel {
       if (requestId === result.id) { requestId = ""; review = ({}); if (screen === "approval") screen = previousScreen }
       return
     }
-    if (result.action === "show-request") { root.open(); root.reviewRequest(result.id); return }
+    if (result.action === "show-request") { if (service.running && requests.includes(result.id)) { root.open(); root.reviewRequest(result.id) }; return }
     if (result.action === "reveal") {
       if (result.error) { clearReveal(); errorText = result.error; return }
       if (!opened || screen !== "fields" || result.id !== itemId || result.field !== revealPending) return
@@ -146,9 +147,12 @@ Panel {
       revealTimer.restart()
       return
     }
-    if (result.action === "recent") {
+    if (result.action === "recent" && !result.error) {
       serviceReady = true
-      if (screen === "checking") screen = "recent"
+      if (screen === "checking") {
+        if (restartVaultPath !== "") { vaultPath = restartVaultPath; restartVaultPath = ""; screen = "password" }
+        else screen = "recent"
+      }
     }
     if (result.action === "items") {
       result.searchGeneration = itemQueries.shift()
@@ -182,14 +186,31 @@ Panel {
       itemGroup = fields.length > 0 && fields[0].group ? fields[0].group : ""
       screen = "fields"
     }
-    else if (result.action === "review") review = result
+    else if (result.action === "review" && result.id === requestId && screen === "approval") review = result
     else if (result.action === "lock" || result.action === "locked") { screen = "recent"; items = []; fields = []; send({action: "recent"}) }
   }
   function displayPath(path) {
     const home = decodeURIComponent(StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")).replace(/\/$/, "")
     return home && (path === home || path.startsWith(home + "/")) ? "~" + path.slice(home.length) : path
   }
-  function openVault(path) { vaultPath = path; errorText = ""; screen = "password" }
+  function openVault(path) {
+    errorText = ""
+    if (!service.running) { restartVaultPath = path; screen = "checking"; service.running = true; return }
+    vaultPath = path; screen = "password"
+  }
+  function serviceExited() {
+    const wasReady = serviceReady
+    serviceReady = false
+    restartVaultPath = ""
+    requests = []; requestId = ""; review = ({}); previousScreen = "recent"
+    items = []; fields = []; itemQueries = []; openSearchGeneration = -1
+    itemId = ""; itemTitle = ""; itemGroup = ""; focusSearchOnResults = false
+    approvalError = ""; decisionError = ""
+    searchTimer.stop(); clearReveal()
+    if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
+    screen = wasReady ? "recent" : "failed"
+    errorText = wasReady ? "" : strings.t("service.incompatible")
+  }
   function openItem(item) { itemId = item.ID; itemTitle = item.Title; send({action: "fields", id: item.ID}) }
   function escapeView() {
     if (screen === "fields") { fields = []; screen = "items"; return true }
@@ -237,7 +258,7 @@ Panel {
     target.forceActiveFocus()
     content.ensureVisible(target)
   }
-  function reviewRequest(id) { if (screen !== "approval") previousScreen = screen; requestId = id; review = ({}); screen = "approval"; send({action: "review", id: id}) }
+  function reviewRequest(id) { if (!service.running || !requests.includes(id)) return; if (screen !== "approval") previousScreen = screen; requestId = id; review = ({}); screen = "approval"; send({action: "review", id: id}) }
   function decideRequest(action) {
     if (!service.running) { decisionError = strings.t("service.unavailable"); return }
     const id = requestId
@@ -283,12 +304,7 @@ Panel {
     stdinEnabled: true
     stdout: SplitParser { onRead: data => root.handle(data) }
     onStarted: root.send({action: "recent"})
-    onExited: {
-      root.items = []; root.fields = []; root.itemQueries = []; root.openSearchGeneration = -1
-      root.screen = "failed"
-      root.errorText = root.serviceReady ? strings.t("service.stopped") : strings.t("service.incompatible")
-      root.serviceReady = false
-    }
+    onExited: root.serviceExited()
   }
   FileDialog {
     id: picker
