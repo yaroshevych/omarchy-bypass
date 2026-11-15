@@ -43,6 +43,7 @@ Panel {
   property string itemGroup: ""
   property string errorText: ""
   property string approvalError: ""
+  property string decisionError: ""
   property var recent: []
   property string recentQuery: ""
   readonly property var filteredRecent: recent.filter(path => path.toLowerCase().includes(recentQuery.toLowerCase().trim()))
@@ -124,6 +125,10 @@ Panel {
     let result
     try { result = JSON.parse(line) } catch (e) { errorText = strings.t("service.invalid_response"); return }
     if (result.action === "approval-status") { approvalError = result.error || ""; return }
+    if (result.action === "approve" || result.action === "deny") {
+      if (result.error) decisionError = result.error
+      return
+    }
     if (result.action === "request") { requests = requests.concat([result.id]); return }
     if (result.action === "request-closed") {
       requests = requests.filter(id => id !== result.id)
@@ -178,7 +183,6 @@ Panel {
       screen = "fields"
     }
     else if (result.action === "review") review = result
-    else if (result.action === "approve" || result.action === "deny") { requestId = ""; review = ({}); screen = previousScreen }
     else if (result.action === "lock" || result.action === "locked") { screen = "recent"; items = []; fields = []; send({action: "recent"}) }
   }
   function displayPath(path) {
@@ -234,6 +238,15 @@ Panel {
     content.ensureVisible(target)
   }
   function reviewRequest(id) { if (screen !== "approval") previousScreen = screen; requestId = id; review = ({}); screen = "approval"; send({action: "review", id: id}) }
+  function decideRequest(action) {
+    if (!service.running) { decisionError = strings.t("service.unavailable"); return }
+    const id = requestId
+    decisionError = ""
+    requests = requests.filter(request => request !== id)
+    requestId = ""; review = ({}); screen = previousScreen
+    send({action: action, id: id})
+    close()
+  }
 
   Timer { id: revealTimer; repeat: false; onTriggered: root.clearReveal() }
 
@@ -628,9 +641,10 @@ Panel {
               BodyText { required property var modelData; text: modelData.Title + ": " + modelData.Field; Layout.fillWidth: true; wrapMode: Text.Wrap }
             }
           }
-          WideButton { text: strings.t("approval.approve"); enabled: (root.review.targets || []).length > 0; onClicked: root.send({action: "approve", id: root.requestId}) }
-          WideButton { text: strings.t("approval.deny"); onClicked: root.send({action: "deny", id: root.requestId}) }
+          WideButton { text: strings.t("approval.approve"); enabled: (root.review.targets || []).length > 0; onClicked: root.decideRequest("approve") }
+          WideButton { text: strings.t("approval.deny"); onClicked: root.decideRequest("deny") }
         }
+        BodyText { visible: root.decisionError !== ""; text: root.decisionError; color: Commons.Color.urgent; wrapMode: Text.Wrap; Layout.fillWidth: true }
       }
     }
   }
