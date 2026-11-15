@@ -211,7 +211,7 @@ Panel {
   }
   Timer { id: searchTimer; interval: 120; repeat: false; onTriggered: root.searchItems(panel.loadedContent.queryField.text) }
   function showAllItems() {
-    if (panel.loadedContent) { searchTimer.stop(); panel.loadedContent.queryField.text = "*"; searchTimer.stop(); searchItems("*") }
+    if (panel.loadedContent) { searchTimer.stop(); searchGeneration++; openSearchGeneration = -1; searchItems("*") }
   }
   function moveList(list, index, direction) {
     if (!panel.loadedContent) return
