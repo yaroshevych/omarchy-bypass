@@ -47,6 +47,7 @@ omarchy plugin remove bypass.vault
 
 Removing the plugin does not uninstall Bypass, delete vaults, or remove the
 Bypass entry from `~/.config/omarchy/extensions/omarchy-menu.jsonc`.
+To uninstall Bypass installed by the widget, run `rm ~/.local/bin/bypass`.
 
 ## Development
 
