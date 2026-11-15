@@ -14,7 +14,7 @@ class SearchTest(unittest.TestCase):
         handle = panel[panel.index("  function handle("):panel.index("  function displayPath(")]
         search = panel[panel.index("  function searchItems("):panel.index("  Timer { id: searchTimer")]
         script = r'''let items = [], itemQueries = [], searchGeneration = 0, openSearchGeneration = -1;
-let screen = "items", errorText = "", focusSearchOnResults = false;
+let screen = "items", errorText = "", focusSearchOnResults = false, stoppingService = false;
 let openedItem = null, sent = [];
 const service = {running: true}, strings = {t: x => x};
 const panel = {loadedContent: {queryField: {text: "old"}}};

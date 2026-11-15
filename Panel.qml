@@ -23,6 +23,7 @@ Panel {
   Component.onCompleted: Plugin.WidgetCoordinator.attach(root)
   Component.onDestruction: {
     findBackend.running = false
+    recentLoader.running = false
     installer.running = false
     service.running = false
     Plugin.WidgetCoordinator.detach(root)
@@ -37,7 +38,9 @@ Panel {
   property string screen: "checking"
   property string backendPath: ""
   property bool serviceReady: false
-  property string restartVaultPath: ""
+  property string pendingPassword: ""
+  property bool stoppingService: false
+  property string stopScreen: "recent"
   property string vaultPath: ""
   property string itemId: ""
   property string itemTitle: ""
@@ -95,6 +98,7 @@ Panel {
       Qt.callLater(function() { if (root.opened && root.screen === "recent") panel.loadedContent.recentFilter.forceActiveFocus() })
     } else {
       if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
+      if (screen === "password" || (screen === "checking" && service.running)) stopService("recent")
       fields = []
       clearReveal()
       if (screen === "fields") screen = "items"
@@ -125,6 +129,7 @@ Panel {
   function handle(line) {
     let result
     try { result = JSON.parse(line) } catch (e) { errorText = strings.t("service.invalid_response"); return }
+    if (stoppingService) return
     if (result.action === "approval-status") { approvalError = result.error || ""; return }
     if (result.action === "approve" || result.action === "deny") {
       if (result.error) decisionError = result.error
@@ -149,9 +154,10 @@ Panel {
     }
     if (result.action === "recent" && !result.error) {
       serviceReady = true
-      if (screen === "checking") {
-        if (restartVaultPath !== "") { vaultPath = restartVaultPath; restartVaultPath = ""; screen = "password" }
-        else screen = "recent"
+      if (screen === "checking" && service.running) {
+        const password = pendingPassword
+        pendingPassword = ""
+        send({action: "open", path: vaultPath, password: password})
       }
     }
     if (result.action === "items") {
@@ -159,12 +165,16 @@ Panel {
       if (result.searchGeneration !== searchGeneration || screen !== "items") return
     }
     errorText = result.error || ""
-    if (result.error) { if (result.action === "items") openSearchGeneration = -1; return }
+    if (result.error) {
+      if (result.action === "items") openSearchGeneration = -1
+      if (result.action === "open") stopService("password")
+      return
+    }
     if (result.action === "recent") {
       recent = result.recent || []
 
     }
-    else if (result.action === "open") { screen = "items"; focusSearchOnResults = true; searchItems("") }
+    else if (result.action === "open") { recent = [vaultPath].concat(recent.filter(path => path !== vaultPath)).slice(0, 10); screen = "items"; focusSearchOnResults = true; searchItems("") }
     else if (result.action === "items") {
       const generation = result.searchGeneration
       items = result.items || []
@@ -187,7 +197,7 @@ Panel {
       screen = "fields"
     }
     else if (result.action === "review" && result.id === requestId && screen === "approval") review = result
-    else if (result.action === "lock" || result.action === "locked") { screen = "recent"; items = []; fields = []; send({action: "recent"}) }
+    else if (result.action === "lock" || result.action === "locked") stopService("recent")
   }
   function displayPath(path) {
     const home = decodeURIComponent(StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")).replace(/\/$/, "")
@@ -195,21 +205,37 @@ Panel {
   }
   function openVault(path) {
     errorText = ""
-    if (!service.running) { restartVaultPath = path; screen = "checking"; service.running = true; return }
     vaultPath = path; screen = "password"
+  }
+  function unlockVault(password) {
+    if (service.running || stoppingService) return
+    errorText = ""; pendingPassword = password; screen = "checking"; service.running = true
+  }
+  function stopService(nextScreen) {
+    pendingPassword = ""
+    stopScreen = nextScreen
+    stoppingService = true
+    if (service.running) {
+      screen = "checking"
+      if (serviceReady) service.write(JSON.stringify({action: "shutdown"}) + "\n")
+      else service.running = false
+    }
+    else { serviceExited() }
   }
   function serviceExited() {
     const wasReady = serviceReady
+    const expected = stoppingService
+    stoppingService = false
     serviceReady = false
-    restartVaultPath = ""
+    pendingPassword = ""
     requests = []; requestId = ""; review = ({}); previousScreen = "recent"
     items = []; fields = []; itemQueries = []; openSearchGeneration = -1
     itemId = ""; itemTitle = ""; itemGroup = ""; focusSearchOnResults = false
     approvalError = ""; decisionError = ""
     searchTimer.stop(); clearReveal()
     if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
-    screen = wasReady ? "recent" : "failed"
-    errorText = wasReady ? "" : strings.t("service.incompatible")
+    screen = expected ? stopScreen : wasReady ? "recent" : "failed"
+    if (!expected) errorText = wasReady ? "" : strings.t("service.incompatible")
   }
   function openItem(item) { itemId = item.ID; itemTitle = item.Title; send({action: "fields", id: item.ID}) }
   function escapeView() {
@@ -218,7 +244,7 @@ Panel {
     if (screen === "password") {
       if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
       errorText = ""
-      screen = "recent"
+      stopService("recent")
       return true
     }
     return false
@@ -278,10 +304,22 @@ Panel {
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0 && root.backendPath !== "") {
         root.screen = "checking"
-        service.running = true
+        recentLoader.running = true
       } else {
         root.screen = "missing"
       }
+    }
+  }
+  Process {
+    id: recentLoader
+    command: [root.backendPath, "widget-recent"]
+    stdout: SplitParser { onRead: function(data) {
+      try { const result = JSON.parse(data); root.recent = result.recent || [] }
+      catch (e) { root.errorText = strings.t("service.invalid_response") }
+    } }
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode === 0 && root.errorText === "") root.screen = "recent"
+      else { root.screen = "failed"; root.errorText = strings.t("service.incompatible") }
     }
   }
   Process {
@@ -482,7 +520,7 @@ Panel {
             implicitHeight: searchField.implicitHeight
             Layout.minimumHeight: searchField.implicitHeight
             Layout.maximumHeight: searchField.implicitHeight
-            onClicked: { password.text = ""; root.screen = "recent" }
+            onClicked: { password.text = ""; root.stopService("recent") }
           }
           BodyText { text: root.displayPath(root.vaultPath); elide: Text.ElideMiddle; Layout.fillWidth: true }
           TextField {
@@ -493,9 +531,9 @@ Panel {
             Keys.onDownPressed: function(event) { root.moveList("password", 1, 1); event.accepted = true }
             Keys.onUpPressed: function(event) { root.moveList("password", 1, -1); event.accepted = true }
             Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
-            onAccepted: { root.send({action: "open", path: root.vaultPath, password: text}); text = "" }
+            onAccepted: { root.unlockVault(text); text = "" }
           }
-          WideButton { id: unlockButton; text: strings.t("vault.unlock"); navigationList: "password"; navigationIndex: 2; onClicked: { root.send({action: "open", path: root.vaultPath, password: password.text}); password.text = "" } }
+          WideButton { id: unlockButton; text: strings.t("vault.unlock"); navigationList: "password"; navigationIndex: 2; onClicked: { root.unlockVault(password.text); password.text = "" } }
         }
         ColumnLayout {
           visible: root.screen === "items" || root.screen === "fields"
