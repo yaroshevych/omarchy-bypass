@@ -9,7 +9,7 @@ class WidgetNavigationTest(unittest.TestCase):
     def test_escape_returns_to_list_then_closes(self):
         panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
         start = panel.index("  function escapeView(")
-        end = panel.index("\n  function moveList(", start)
+        end = panel.index("\n  function searchItems(", start)
         escape_view = panel[start:end]
         qml = '''import QtQuick
 QtObject {
@@ -20,9 +20,12 @@ QtObject {
  property var panel: QtObject {
   property var loadedContent: QtObject {
    property var passwordField: QtObject { property string text: "synthetic password" }
+   property var queryField: QtObject { property string text: "query" }
   }
  }
  function close() { closed = true }
+ function stopService(next) { screen = next }
+ function searchItems(query) {}
 ''' + escape_view + '''
  Component.onCompleted: {
   if (!escapeView() || screen !== "items" || fields.length !== 0 || closed) throw new Error("item escape")

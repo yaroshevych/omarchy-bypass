@@ -45,6 +45,8 @@ Panel {
   property string itemId: ""
   property string itemTitle: ""
   property string itemGroup: ""
+  property bool itemFavorite: false
+  property bool favoritePending: false
   property string errorText: ""
   property string approvalError: ""
   property string decisionError: ""
@@ -60,9 +62,10 @@ Panel {
   property string requestId: ""
   property var review: ({})
   property string previousScreen: "recent"
-  property string revealedField: ""
-  property string revealedValue: ""
-  property string revealPending: ""
+  property var revealedValues: ({})
+  property var revealRequests: []
+  property int revealGeneration: 0
+  property bool revealing: false
   property bool focusSearchOnResults: false
   Commons.Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
 
@@ -114,12 +117,22 @@ Panel {
     })
   }
 
-  function clearReveal() { revealedField = ""; revealedValue = ""; revealPending = ""; revealTimer.stop() }
-  function toggleReveal(field) {
-    if (revealedField === field || revealPending === field) { clearReveal(); return }
+  function clearReveal() {
+    revealGeneration++
+    revealedValues = ({})
+    revealing = false
+    revealTimer.stop()
+  }
+  function toggleReveal() {
+    if (revealing) { clearReveal(); return }
     clearReveal()
-    revealPending = field
-    send({action: "reveal", id: itemId, field: field})
+    const protectedFields = fields.filter(field => field.Protected)
+    if (protectedFields.length === 0) return
+    revealing = true
+    for (const field of protectedFields) {
+      revealRequests.push({id: itemId, field: field.Name, generation: revealGeneration})
+      send({action: "reveal", id: itemId, field: field.Name})
+    }
   }
 
   function send(value) {
@@ -130,6 +143,13 @@ Panel {
     let result
     try { result = JSON.parse(line) } catch (e) { errorText = strings.t("service.invalid_response"); return }
     if (stoppingService) return
+    if (result.action === "add-favorite") {
+      favoritePending = false
+      if (result.error) { errorText = result.error; return }
+      if (result.id === itemId) itemFavorite = true
+      items = items.map(item => item.ID === result.id ? Object.assign({}, item, {Favorite: true}) : item)
+      return
+    }
     if (result.action === "approval-status") { approvalError = result.error || ""; return }
     if (result.action === "approve" || result.action === "deny") {
       if (result.error) decisionError = result.error
@@ -143,13 +163,18 @@ Panel {
     }
     if (result.action === "show-request") { if (service.running && requests.includes(result.id)) { root.open(); root.reviewRequest(result.id) }; return }
     if (result.action === "reveal") {
+      const request = revealRequests.shift()
+      if (!request || request.generation !== revealGeneration || !opened || screen !== "fields" || request.id !== itemId) return
       if (result.error) { clearReveal(); errorText = result.error; return }
-      if (!opened || screen !== "fields" || result.id !== itemId || result.field !== revealPending) return
-      revealedField = result.field
-      revealedValue = result.value || ""
-      revealPending = ""
-      revealTimer.interval = Math.max(1, Math.min(10, result.remaining || 10)) * 1000
-      revealTimer.restart()
+      if (result.id !== request.id || result.field !== request.field) return
+      const values = Object.assign({}, revealedValues)
+      values[result.field] = result.value || ""
+      revealedValues = values
+      const duration = Math.max(1, Math.min(10, result.remaining || 10)) * 1000
+      if (!revealTimer.running || duration < revealTimer.interval) {
+        revealTimer.interval = duration
+        revealTimer.restart()
+      }
       return
     }
     if (result.action === "recent" && !result.error) {
@@ -229,17 +254,17 @@ Panel {
     serviceReady = false
     pendingPassword = ""
     requests = []; requestId = ""; review = ({}); previousScreen = "recent"
-    items = []; fields = []; itemQueries = []; openSearchGeneration = -1
-    itemId = ""; itemTitle = ""; itemGroup = ""; focusSearchOnResults = false
+    items = []; fields = []; itemQueries = []; revealRequests = []; openSearchGeneration = -1
+    itemId = ""; itemTitle = ""; itemGroup = ""; itemFavorite = false; favoritePending = false; focusSearchOnResults = false
     approvalError = ""; decisionError = ""
     searchTimer.stop(); clearReveal()
     if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
     screen = expected ? stopScreen : wasReady ? "recent" : "failed"
     if (!expected) errorText = wasReady ? "" : strings.t("service.incompatible")
   }
-  function openItem(item) { itemId = item.ID; itemTitle = item.Title; send({action: "fields", id: item.ID}) }
+  function openItem(item) { itemId = item.ID; itemTitle = item.Title; itemFavorite = !!item.Favorite; send({action: "fields", id: item.ID}) }
   function escapeView() {
-    if (screen === "fields") { fields = []; screen = "items"; return true }
+    if (screen === "fields") { fields = []; screen = "items"; if (panel.loadedContent && panel.loadedContent.queryField.text === "") searchItems(""); return true }
     if (screen === "items") { close(); return true }
     if (screen === "password") {
       if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
@@ -340,6 +365,13 @@ Panel {
   Process {
     id: registerMenu
     command: ["python3", decodeURIComponent(Qt.resolvedUrl("register-menu.py").toString().replace(/^file:\/\//, ""))]
+  }
+  Process {
+    id: editLauncher
+    command: ["omarchy-launch-tui", root.backendPath, root.vaultPath]
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+    }
   }
   Process {
     id: service
@@ -570,7 +602,7 @@ Panel {
               implicitHeight: searchField.implicitHeight
               Layout.minimumHeight: searchField.implicitHeight
               Layout.maximumHeight: searchField.implicitHeight
-              onClicked: { root.fields = []; root.screen = "items" }
+              onClicked: root.escapeView()
             }
             Ui.Button {
               text: strings.t("vault.lock")
@@ -637,20 +669,12 @@ Panel {
               RowLayout {
                 Layout.fillWidth: true
                 BodyText {
-                  text: modelData.Protected ? (root.revealedField === modelData.Name ? root.revealedValue : "••••••••") : modelData.Value
+                  text: modelData.Protected ? (Object.prototype.hasOwnProperty.call(root.revealedValues, modelData.Name) ? root.revealedValues[modelData.Name] : "••••••••") : modelData.Value
                   color: Qt.darker(Commons.Color.foreground, 1.3)
                   wrapMode: modelData.Name === "Notes" ? Text.Wrap : Text.NoWrap
                   maximumLineCount: modelData.Name === "Notes" ? 5 : 1
                   elide: Text.ElideRight
                   Layout.fillWidth: true
-                }
-                PanelActionButton {
-                  visible: modelData.Protected
-                  iconText: root.revealedField === modelData.Name ? "󰈉" : "󰈈"
-                  tooltipText: root.revealedField === modelData.Name ? strings.t("secret.hide") : strings.t("secret.reveal")
-                  focusable: true
-                  opacity: fieldRow.actionsHovered || activeFocus ? 1 : 0
-                  onClicked: root.toggleReveal(modelData.Name)
                 }
                 PanelActionButton {
                   iconText: "󰆏"
@@ -660,6 +684,29 @@ Panel {
                   onClicked: root.send({action: "copy", id: root.itemId, field: modelData.Name})
                 }
               }
+            }
+          }
+          RowLayout {
+            Layout.fillWidth: true
+            PanelActionButton {
+              iconText: "󰏫"
+              tooltipText: strings.t("vault.edit")
+              focusable: true
+              onClicked: editLauncher.running = true
+            }
+            PanelActionButton {
+              iconText: root.revealing ? "󰈉" : "󰈈"
+              tooltipText: root.revealing ? strings.t("secret.hide") : strings.t("secret.reveal")
+              focusable: true
+              enabled: root.fields.some(field => field.Protected)
+              onClicked: root.toggleReveal()
+            }
+            PanelActionButton {
+              iconText: "󰓎"
+              tooltipText: root.itemFavorite ? strings.t("vault.favorited") : strings.t("vault.add_favorite")
+              focusable: true
+              enabled: !root.itemFavorite && !root.favoritePending
+              onClicked: { root.favoritePending = true; root.errorText = ""; root.send({action: "add-favorite", id: root.itemId}) }
             }
           }
         }
