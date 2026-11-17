@@ -384,7 +384,7 @@ Panel {
   }
   Process {
     id: editLauncher
-    command: ["omarchy-launch-tui", root.backendPath, root.vaultPath]
+    command: ["sh", decodeURIComponent(Qt.resolvedUrl("launch-edit.sh").toString().replace(/^file:\/\//, "")), root.backendPath, root.vaultPath]
     onExited: function(exitCode, exitStatus) {
       if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
     }
