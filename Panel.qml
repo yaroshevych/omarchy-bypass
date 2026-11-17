@@ -47,6 +47,8 @@ Panel {
   property string itemGroup: ""
   property bool itemFavorite: false
   property bool favoritePending: false
+  property string favoriteConsent: ""
+  property string favoriteLossMessage: ""
   property string errorText: ""
   property string approvalError: ""
   property string decisionError: ""
@@ -104,7 +106,8 @@ Panel {
       if (screen === "password" || (screen === "checking" && service.running)) stopService("recent")
       fields = []
       clearReveal()
-      if (screen === "fields") screen = "items"
+      if (screen === "fields" || screen === "favorite-confirm") screen = "items"
+      favoriteConsent = ""; favoriteLossMessage = ""
     }
   }
   onScreenChanged: {
@@ -114,6 +117,7 @@ Panel {
       if (root.screen === "password") panel.loadedContent.passwordField.forceActiveFocus()
       else if (root.screen === "items") panel.loadedContent.queryField.forceActiveFocus()
       else if (root.screen === "recent") panel.loadedContent.recentFilter.forceActiveFocus()
+      else if (root.screen === "favorite-confirm") panel.loadedContent.favoriteCancel.forceActiveFocus()
     })
   }
 
@@ -145,7 +149,13 @@ Panel {
     if (stoppingService) return
     if (result.action === "add-favorite") {
       favoritePending = false
-      if (result.error) { errorText = result.error; return }
+      if (result.error) {
+        if (result.consent && result.lossMessage && opened && screen === "fields" && result.id === itemId) {
+          favoriteConsent = result.consent; favoriteLossMessage = result.lossMessage; screen = "favorite-confirm"
+        } else if (opened && result.id === itemId) errorText = result.error
+        return
+      }
+      favoriteConsent = ""; favoriteLossMessage = ""
       if (result.id === itemId) itemFavorite = true
       items = items.map(item => item.ID === result.id ? Object.assign({}, item, {Favorite: true}) : item)
       return
@@ -255,7 +265,7 @@ Panel {
     pendingPassword = ""
     requests = []; requestId = ""; review = ({}); previousScreen = "recent"
     items = []; fields = []; itemQueries = []; revealRequests = []; openSearchGeneration = -1
-    itemId = ""; itemTitle = ""; itemGroup = ""; itemFavorite = false; favoritePending = false; focusSearchOnResults = false
+    itemId = ""; itemTitle = ""; itemGroup = ""; itemFavorite = false; favoritePending = false; favoriteConsent = ""; favoriteLossMessage = ""; focusSearchOnResults = false
     approvalError = ""; decisionError = ""
     searchTimer.stop(); clearReveal()
     if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
@@ -264,6 +274,7 @@ Panel {
   }
   function openItem(item) { itemId = item.ID; itemTitle = item.Title; itemFavorite = !!item.Favorite; send({action: "fields", id: item.ID}) }
   function escapeView() {
+    if (screen === "favorite-confirm") { favoriteConsent = ""; favoriteLossMessage = ""; screen = "fields"; return true }
     if (screen === "fields") { fields = []; screen = "items"; if (panel.loadedContent && panel.loadedContent.queryField.text === "") searchItems(""); return true }
     if (screen === "items") { close(); return true }
     if (screen === "password") {
@@ -409,6 +420,7 @@ Panel {
       property alias unlockButton: unlockButton
       property alias passwordBackButton: passwordBackButton
       property alias fieldsBackButton: fieldsBackButton
+      property alias favoriteCancel: favoriteCancel
       property alias fieldRepeater: fieldRows
       property alias queryField: searchField
       property alias recentRepeater: recentRows
@@ -707,6 +719,24 @@ Panel {
               focusable: true
               enabled: !root.itemFavorite && !root.favoritePending
               onClicked: { root.favoritePending = true; root.errorText = ""; root.send({action: "add-favorite", id: root.itemId}) }
+            }
+          }
+        }
+        ColumnLayout {
+          visible: root.screen === "favorite-confirm"
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+          PanelSeparator { Layout.fillWidth: true }
+          PanelSectionHeader { text: strings.t("metadata.title"); Layout.fillWidth: true }
+          BodyText { text: root.favoriteLossMessage; wrapMode: Text.Wrap; Layout.fillWidth: true }
+          WideButton { id: favoriteCancel; text: strings.t("metadata.cancel"); onClicked: root.escapeView() }
+          WideButton {
+            text: strings.t("metadata.confirm")
+            onClicked: {
+              const consent = root.favoriteConsent
+              root.favoriteConsent = ""; root.favoriteLossMessage = ""; root.screen = "fields"
+              root.favoritePending = true; root.errorText = ""
+              root.send({action: "add-favorite", id: root.itemId, consent: consent})
             }
           }
         }
