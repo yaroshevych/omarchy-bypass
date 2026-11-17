@@ -26,7 +26,7 @@
   "vault.edit": "Edit",
   "vault.launch_failed": "Could not launch Bypass",
   "vault.add_favorite": "Add to favourites",
-  "vault.favorited": "In favourites",
+  "vault.remove_favorite": "Remove from favourites",
   "back": "Back",
   "search": "Search",
   "copy.path": "Copy path",

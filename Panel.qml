@@ -48,6 +48,7 @@ Panel {
   property bool itemFavorite: false
   property bool favoritePending: false
   property string favoriteConsent: ""
+  property string favoriteAction: ""
   property string favoriteLossMessage: ""
   property string errorText: ""
   property string approvalError: ""
@@ -151,17 +152,18 @@ Panel {
     let result
     try { result = JSON.parse(line) } catch (e) { errorText = strings.t("service.invalid_response"); return }
     if (stoppingService) return
-    if (result.action === "add-favorite") {
+    if (result.action === "add-favorite" || result.action === "remove-favorite") {
       favoritePending = false
       if (result.error) {
         if (result.consent && result.lossMessage && opened && screen === "fields" && result.id === itemId) {
-          favoriteConsent = result.consent; favoriteLossMessage = result.lossMessage; screen = "favorite-confirm"
+          favoriteConsent = result.consent; favoriteAction = result.action; favoriteLossMessage = result.lossMessage; screen = "favorite-confirm"
         } else if (opened && result.id === itemId) errorText = result.error
         return
       }
       favoriteConsent = ""; favoriteLossMessage = ""
-      if (result.id === itemId) itemFavorite = true
-      items = items.map(item => item.ID === result.id ? Object.assign({}, item, {Favorite: true}) : item)
+      const favorite = result.action === "add-favorite"
+      if (result.id === itemId) itemFavorite = favorite
+      items = items.map(item => item.ID === result.id ? Object.assign({}, item, {Favorite: favorite}) : item)
       return
     }
     if (result.action === "approval-status") { approvalError = result.error || ""; return }
@@ -719,11 +721,11 @@ Panel {
               onClicked: root.toggleReveal()
             }
             PanelActionButton {
-              iconText: "󰓎"
-              tooltipText: root.itemFavorite ? strings.t("vault.favorited") : strings.t("vault.add_favorite")
+              iconText: root.itemFavorite ? "󰓏" : "󰓎"
+              tooltipText: root.itemFavorite ? strings.t("vault.remove_favorite") : strings.t("vault.add_favorite")
               focusable: true
-              enabled: !root.itemFavorite && !root.favoritePending
-              onClicked: { root.favoritePending = true; root.errorText = ""; root.send({action: "add-favorite", id: root.itemId}) }
+              enabled: !root.favoritePending
+              onClicked: { root.favoritePending = true; root.errorText = ""; root.send({action: root.itemFavorite ? "remove-favorite" : "add-favorite", id: root.itemId}) }
             }
           }
         }
@@ -739,9 +741,10 @@ Panel {
             text: strings.t("metadata.confirm")
             onClicked: {
               const consent = root.favoriteConsent
+              const action = root.favoriteAction
               root.favoriteConsent = ""; root.favoriteLossMessage = ""; root.screen = "fields"
               root.favoritePending = true; root.errorText = ""
-              root.send({action: "add-favorite", id: root.itemId, consent: consent})
+              root.send({action: action, id: root.itemId, consent: consent})
             }
           }
         }
