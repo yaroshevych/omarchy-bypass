@@ -135,13 +135,24 @@ Panel {
     revealTimer.stop()
   }
   function toggleReveal(field) {
-    if (revealing && revealingField === field.Name) { clearReveal(); return }
+    if (revealing && (revealingField === "" || revealingField === field.Name)) { clearReveal(); return }
     clearReveal()
     if (!field.Protected) return
     revealing = true
     revealingField = field.Name
     revealRequests.push({id: itemId, field: field.Name, generation: revealGeneration})
     send({action: "reveal", id: itemId, field: field.Name})
+  }
+  function toggleRevealAll() {
+    if (revealing) { clearReveal(); return }
+    clearReveal()
+    const protectedFields = fields.filter(field => field.Protected)
+    if (protectedFields.length === 0) return
+    revealing = true
+    for (const field of protectedFields) {
+      revealRequests.push({id: itemId, field: field.Name, generation: revealGeneration})
+      send({action: "reveal", id: itemId, field: field.Name})
+    }
   }
 
   function send(value) {
@@ -705,8 +716,8 @@ Panel {
                 }
                 PanelActionButton {
                   visible: modelData.Protected
-                  iconText: root.revealing && root.revealingField === modelData.Name ? "󰈉" : "󰈈"
-                  tooltipText: root.revealing && root.revealingField === modelData.Name ? strings.t("secret.hide") : strings.t("secret.reveal")
+                  iconText: root.revealing && (root.revealingField === "" || root.revealingField === modelData.Name) ? "󰈉" : "󰈈"
+                  tooltipText: root.revealing && (root.revealingField === "" || root.revealingField === modelData.Name) ? strings.t("secret.hide") : strings.t("secret.reveal")
                   focusable: true
                   opacity: fieldValueHover.hovered ? 1 : 0
                   onClicked: {
@@ -727,11 +738,19 @@ Panel {
           }
           RowLayout {
             Layout.fillWidth: true
+            Layout.topMargin: Style.space(8)
             PanelActionButton {
               iconText: "󰏫"
               tooltipText: strings.t("vault.edit")
               focusable: true
               onClicked: { editLauncher.running = true; root.close() }
+            }
+            PanelActionButton {
+              iconText: root.revealing ? "󰈉" : "󰈈"
+              tooltipText: root.revealing ? strings.t("secret.hide") : strings.t("secret.reveal")
+              focusable: true
+              enabled: root.fields.some(field => field.Protected)
+              onClicked: root.toggleRevealAll()
             }
             PanelActionButton {
               iconText: root.itemFavorite ? "󰓏" : "󰓎"
