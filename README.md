@@ -32,6 +32,14 @@ not prevent executed commands from exposing secrets, for example logging secrets
 omarchy plugin add https://github.com/yaroshevych/omarchy-bypass.git --enable
 ```
 
+If you installed an earlier version as `bypass.vault`, remove that plugin and
+install it again to register the new `bypass.widget` ID:
+
+```sh
+omarchy plugin remove bypass.vault
+omarchy plugin add https://github.com/yaroshevych/omarchy-bypass.git --enable
+```
+
 Open the Bypass icon in the bar. If Bypass is not installed, the widget offers to
 run the official installer. After installation, it also adds Bypass to the
 Omarchy menu if an entry named `bypass` does not already exist.
@@ -42,7 +50,7 @@ monitors, the widget appears on the first available bar.
 ## Remove
 
 ```sh
-omarchy plugin remove bypass.vault
+omarchy plugin remove bypass.widget
 ```
 
 Removing the plugin does not uninstall Bypass, delete vaults, or remove the

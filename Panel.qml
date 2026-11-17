@@ -14,8 +14,8 @@ import "." as Plugin
 
 Panel {
   id: root
-  moduleName: "bypass.vault"
-  ipcTarget: "bypass.vault"
+  moduleName: "bypass.widget"
+  ipcTarget: "bypass.widget"
   readonly property bool isOwner: Plugin.WidgetCoordinator.owner === root
   visible: isOwner
   implicitWidth: isOwner ? button.implicitWidth : 0
