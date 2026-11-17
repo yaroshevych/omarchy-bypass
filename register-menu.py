@@ -50,7 +50,7 @@ if not isinstance(items, dict):
     raise ValueError('Menu must be a JSON object')
 if 'bypass' not in items:
     comma = ',' if clean[last] not in '{,' else ''
-    entry = '\n  "bypass": {"icon":"󰌋","label":"Bypass","action":"omarchy-launch-or-focus-tui bypass"}\n'
+    entry = '\n  "bypass": {"icon":"󰌋","label":"Bypass","action":"omarchy-launch-tui --app-id=org.omarchy.bypass-menu bypass"}\n'
     updated = source[:last+1] + comma + source[last+1:end] + entry + source[end:]
     fd, temp = tempfile.mkstemp(dir=path.parent, prefix='.bypass-menu-')
     try:
