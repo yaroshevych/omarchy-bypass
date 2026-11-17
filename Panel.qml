@@ -70,6 +70,7 @@ Panel {
   property var revealRequests: []
   property int revealGeneration: 0
   property bool revealing: false
+  property string revealingField: ""
   property bool focusSearchOnResults: false
   Commons.Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
 
@@ -130,18 +131,17 @@ Panel {
     revealGeneration++
     revealedValues = ({})
     revealing = false
+    revealingField = ""
     revealTimer.stop()
   }
-  function toggleReveal() {
-    if (revealing) { clearReveal(); return }
+  function toggleReveal(field) {
+    if (revealing && revealingField === field.Name) { clearReveal(); return }
     clearReveal()
-    const protectedFields = fields.filter(field => field.Protected)
-    if (protectedFields.length === 0) return
+    if (!field.Protected) return
     revealing = true
-    for (const field of protectedFields) {
-      revealRequests.push({id: itemId, field: field.Name, generation: revealGeneration})
-      send({action: "reveal", id: itemId, field: field.Name})
-    }
+    revealingField = field.Name
+    revealRequests.push({id: itemId, field: field.Name, generation: revealGeneration})
+    send({action: "reveal", id: itemId, field: field.Name})
   }
 
   function send(value) {
@@ -677,30 +677,50 @@ Panel {
               id: fieldRow
               required property var modelData
               required property int index
-              readonly property bool actionsHovered: fieldHover.hovered
               Layout.fillWidth: true
-              HoverHandler { id: fieldHover }
               RowLayout {
                 Layout.fillWidth: true
-                BodyText { text: modelData.Name; color: Commons.Color.foreground; Layout.fillWidth: true }
-                PanelActionButton { iconText: "󰌷"; tooltipText: "Copy bypass://" + (fieldRow.modelData.group ? fieldRow.modelData.group + "/" : "") + root.itemTitle + "#" + fieldRow.modelData.Name; focusable: true; opacity: fieldHover.hovered || activeFocus ? 1 : 0; onClicked: root.send({action: "copy-reference", id: root.itemId, field: modelData.Name}) }
+                HoverHandler { id: fieldNameHover }
+                BodyText { text: modelData.Name; color: fieldNameHover.hovered ? Commons.Color.accent : Commons.Color.foreground; Layout.fillWidth: true }
+                PanelActionButton {
+                  iconText: "󰌷"
+                  tooltipText: "Copy bypass://" + (fieldRow.modelData.group ? fieldRow.modelData.group + "/" : "") + root.itemTitle + "#" + fieldRow.modelData.Name
+                  focusable: true
+                  opacity: fieldNameHover.hovered ? 1 : 0
+                  onClicked: {
+                    root.send({action: "copy-reference", id: root.itemId, field: modelData.Name})
+                  }
+                }
               }
               RowLayout {
                 Layout.fillWidth: true
+                HoverHandler { id: fieldValueHover }
                 BodyText {
                   text: modelData.Protected ? (Object.prototype.hasOwnProperty.call(root.revealedValues, modelData.Name) ? root.revealedValues[modelData.Name] : "••••••••") : modelData.Value
-                  color: Qt.darker(Commons.Color.foreground, 1.3)
+                  color: fieldValueHover.hovered ? Commons.Color.accent : Qt.darker(Commons.Color.foreground, 1.3)
                   wrapMode: modelData.Name === "Notes" ? Text.Wrap : Text.NoWrap
                   maximumLineCount: modelData.Name === "Notes" ? 5 : 1
                   elide: Text.ElideRight
                   Layout.fillWidth: true
                 }
                 PanelActionButton {
+                  visible: modelData.Protected
+                  iconText: root.revealing && root.revealingField === modelData.Name ? "󰈉" : "󰈈"
+                  tooltipText: root.revealing && root.revealingField === modelData.Name ? strings.t("secret.hide") : strings.t("secret.reveal")
+                  focusable: true
+                  opacity: fieldValueHover.hovered ? 1 : 0
+                  onClicked: {
+                    root.toggleReveal(modelData)
+                  }
+                }
+                PanelActionButton {
                   iconText: "󰆏"
                   tooltipText: strings.t("copy.value")
                   focusable: true
-                  opacity: fieldRow.actionsHovered || activeFocus ? 1 : 0
-                  onClicked: root.send({action: "copy", id: root.itemId, field: modelData.Name})
+                  opacity: fieldValueHover.hovered ? 1 : 0
+                  onClicked: {
+                    root.send({action: "copy", id: root.itemId, field: modelData.Name})
+                  }
                 }
               }
             }
@@ -712,13 +732,6 @@ Panel {
               tooltipText: strings.t("vault.edit")
               focusable: true
               onClicked: { editLauncher.running = true; root.close() }
-            }
-            PanelActionButton {
-              iconText: root.revealing ? "󰈉" : "󰈈"
-              tooltipText: root.revealing ? strings.t("secret.hide") : strings.t("secret.reveal")
-              focusable: true
-              enabled: root.fields.some(field => field.Protected)
-              onClicked: root.toggleReveal()
             }
             PanelActionButton {
               iconText: root.itemFavorite ? "󰓏" : "󰓎"
