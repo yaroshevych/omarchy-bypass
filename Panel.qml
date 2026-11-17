@@ -56,6 +56,7 @@ Panel {
   property string recentQuery: ""
   readonly property var filteredRecent: recent.filter(path => path.toLowerCase().includes(recentQuery.toLowerCase().trim()))
   property var items: []
+  property bool showingAllItems: false
   property var itemQueries: []
   property int searchGeneration: 0
   property int openSearchGeneration: -1
@@ -107,6 +108,9 @@ Panel {
       fields = []
       clearReveal()
       if (screen === "fields" || screen === "favorite-confirm") screen = "items"
+      if (showingAllItems && service.running && screen === "items") {
+        showingAllItems = false; searchTimer.stop(); searchGeneration++; openSearchGeneration = -1; searchItems("")
+      }
       favoriteConsent = ""; favoriteLossMessage = ""
     }
   }
@@ -209,7 +213,7 @@ Panel {
       recent = result.recent || []
 
     }
-    else if (result.action === "open") { recent = [vaultPath].concat(recent.filter(path => path !== vaultPath)).slice(0, 10); screen = "items"; focusSearchOnResults = true; searchItems("") }
+    else if (result.action === "open") { showingAllItems = false; recent = [vaultPath].concat(recent.filter(path => path !== vaultPath)).slice(0, 10); screen = "items"; focusSearchOnResults = true; searchItems("") }
     else if (result.action === "items") {
       const generation = result.searchGeneration
       items = result.items || []
@@ -264,7 +268,7 @@ Panel {
     serviceReady = false
     pendingPassword = ""
     requests = []; requestId = ""; review = ({}); previousScreen = "recent"
-    items = []; fields = []; itemQueries = []; revealRequests = []; openSearchGeneration = -1
+    items = []; fields = []; itemQueries = []; revealRequests = []; openSearchGeneration = -1; showingAllItems = false
     itemId = ""; itemTitle = ""; itemGroup = ""; itemFavorite = false; favoritePending = false; favoriteConsent = ""; favoriteLossMessage = ""; focusSearchOnResults = false
     approvalError = ""; decisionError = ""
     searchTimer.stop(); clearReveal()
@@ -275,7 +279,7 @@ Panel {
   function openItem(item) { itemId = item.ID; itemTitle = item.Title; itemFavorite = !!item.Favorite; send({action: "fields", id: item.ID}) }
   function escapeView() {
     if (screen === "favorite-confirm") { favoriteConsent = ""; favoriteLossMessage = ""; screen = "fields"; return true }
-    if (screen === "fields") { fields = []; screen = "items"; if (panel.loadedContent && panel.loadedContent.queryField.text === "") searchItems(""); return true }
+    if (screen === "fields") { fields = []; screen = "items"; if (panel.loadedContent && panel.loadedContent.queryField.text === "") { showingAllItems = false; searchItems("") }; return true }
     if (screen === "items") { close(); return true }
     if (screen === "password") {
       if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
@@ -298,12 +302,13 @@ Panel {
   }
   Timer { id: searchTimer; interval: 120; repeat: false; onTriggered: root.searchItems(panel.loadedContent.queryField.text) }
   function showAllItems() {
-    if (panel.loadedContent) { searchTimer.stop(); searchGeneration++; openSearchGeneration = -1; searchItems("*") }
+    if (panel.loadedContent) { searchTimer.stop(); searchGeneration++; openSearchGeneration = -1; showingAllItems = true; searchItems("*") }
   }
   function moveList(list, index, direction) {
     if (!panel.loadedContent) return
     const content = panel.loadedContent
-    const count = list === "recent" ? filteredRecent.length : list === "password" ? 3 : list === "fields" ? fields.length + 1 : items.length + 2
+    const showAllVisible = list === "items" && content.showAllButton.visible
+    const count = list === "recent" ? filteredRecent.length : list === "password" ? 3 : list === "fields" ? fields.length + 1 : items.length + (showAllVisible ? 2 : 1)
     let next = index + direction
     if (list === "items" && index < 0) next = direction > 0 ? 0 : count - 1
     else next = (next + count) % count
@@ -315,7 +320,7 @@ Panel {
         ? [content.passwordBackButton, content.passwordField, content.unlockButton][next]
         : list === "fields"
           ? (next === 0 ? content.fieldsBackButton : content.fieldRepeater.itemAt(next - 1))
-          : next === items.length ? content.showAllButton : next === items.length + 1 ? content.queryField : content.itemRepeater.itemAt(next)
+          : next === items.length && showAllVisible ? content.showAllButton : next >= items.length ? content.queryField : content.itemRepeater.itemAt(next)
     if (!target) return
     target.forceActiveFocus()
     content.ensureVisible(target)
@@ -599,7 +604,7 @@ Panel {
               Layout.fillWidth: true
               Layout.minimumWidth: 0
               Layout.maximumHeight: implicitHeight
-              onTextChanged: { root.searchGeneration++; root.openSearchGeneration = -1; searchTimer.restart() }
+              onTextChanged: { root.showingAllItems = false; root.searchGeneration++; root.openSearchGeneration = -1; searchTimer.restart() }
               Keys.onDownPressed: function(event) { root.moveList("items", -1, 1); event.accepted = true }
               Keys.onUpPressed: function(event) { root.moveList("items", -1, -1); event.accepted = true }
               Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
@@ -631,7 +636,7 @@ Panel {
           visible: root.screen === "items"
           Layout.fillWidth: true
           spacing: Style.space(8)
-          PanelSectionHeader { text: searchField.text === "" ? strings.t("vault.favorites") : strings.t("vault.results"); Layout.fillWidth: true }
+          PanelSectionHeader { visible: !root.showingAllItems; text: searchField.text === "" ? strings.t("vault.favorites") : strings.t("vault.results"); Layout.fillWidth: true }
           Repeater {
             id: itemRows
             model: root.items
@@ -652,7 +657,7 @@ Panel {
           }
           WideButton {
             id: showAllButton
-            visible: searchField.text === ""
+            visible: searchField.text === "" && !root.showingAllItems
             text: strings.t("vault.show_all")
             navigationList: "items"
             navigationIndex: root.items.length
@@ -704,7 +709,7 @@ Panel {
               iconText: "󰏫"
               tooltipText: strings.t("vault.edit")
               focusable: true
-              onClicked: editLauncher.running = true
+              onClicked: { editLauncher.running = true; root.close() }
             }
             PanelActionButton {
               iconText: root.revealing ? "󰈉" : "󰈈"
