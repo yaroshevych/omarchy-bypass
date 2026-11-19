@@ -100,6 +100,9 @@ QtObject {
    property var unlockButton: QtObject { function forceActiveFocus() { root.last = "unlock" } }
    property var passwordBackButton: QtObject { function forceActiveFocus() { root.last = "back" } }
    property var fieldsBackButton: QtObject { function forceActiveFocus() { root.last = "fields-back" } }
+   property var editAction: QtObject { property bool enabled: true; property bool visible: true; function forceActiveFocus() { root.last = "edit" } }
+   property var revealAction: QtObject { property bool enabled: false; property bool visible: true; function forceActiveFocus() { root.last = "reveal" } }
+   property var favoriteAction: QtObject { property bool enabled: true; property bool visible: true; function forceActiveFocus() { root.last = "favorite" } }
    property var fieldRepeater: QtObject {
     function itemAt(index) { return index === 0 ? first : second }
     property var first: QtObject { function forceActiveFocus() { root.last = "username" } }
@@ -125,6 +128,14 @@ QtObject {
   moveList("fields", 1, 1); if (last !== "password-field") throw new Error("fields down")
   moveList("fields", 2, -1); if (last !== "username") throw new Error("fields up")
   moveList("fields", 1, -1); if (last !== "fields-back") throw new Error("fields back")
+  moveList("fields", 2, 1); if (last !== "edit") throw new Error("fields to actions")
+  moveList("fields", 3, 1); if (last !== "favorite") throw new Error("skip disabled action")
+  moveList("fields", 5, -1); if (last !== "edit") throw new Error("reverse skip disabled action")
+  moveList("fields", 3, -1); if (last !== "password-field") throw new Error("actions to fields")
+  moveFieldAction(0, 1); if (last !== "favorite") throw new Error("right skips disabled action")
+  moveFieldAction(2, -1); if (last !== "edit") throw new Error("left skips disabled action")
+  panel.loadedContent.revealAction.enabled = true
+  moveFieldAction(0, 1); if (last !== "reveal") throw new Error("right reaches reveal")
   console.log("navigation passed")
   Qt.quit()
  }

@@ -247,6 +247,12 @@ Panel {
       fields = (result.fields || []).filter(field => field.Name !== "Title")
       itemGroup = fields.length > 0 && fields[0].group ? fields[0].group : ""
       screen = "fields"
+      Qt.callLater(function() {
+        if (root.opened && root.screen === "fields" && panel.loadedContent) {
+          const target = fields.length ? panel.loadedContent.fieldRepeater.itemAt(0) : panel.loadedContent.fieldsBackButton
+          if (target) { target.forceActiveFocus(); panel.loadedContent.ensureVisible(target) }
+        }
+      })
     }
     else if (result.action === "review" && result.id === requestId && screen === "approval") review = result
     else if (result.action === "lock" || result.action === "locked") stopService("recent")
@@ -320,6 +326,21 @@ Panel {
   function moveList(list, index, direction) {
     if (!panel.loadedContent) return
     const content = panel.loadedContent
+    if (list === "fields") {
+      const targets = [content.fieldsBackButton]
+      for (let i = 0; i < fields.length; i++) targets.push(content.fieldRepeater.itemAt(i))
+      targets.push(content.editAction, content.revealAction, content.favoriteAction)
+      for (let step = 1; step <= targets.length; step++) {
+        const next = (index + direction * step + targets.length) % targets.length
+        const target = targets[next]
+        if (target && target.enabled !== false && target.visible !== false) {
+          target.forceActiveFocus()
+          content.ensureVisible(target)
+          return
+        }
+      }
+      return
+    }
     const showAllVisible = list === "items" && content.showAllButton.visible
     const count = list === "recent" ? filteredRecent.length : list === "password" ? 3 : list === "fields" ? fields.length + 1 : items.length + (showAllVisible ? 2 : 1)
     let next = index + direction
@@ -337,6 +358,18 @@ Panel {
     if (!target) return
     target.forceActiveFocus()
     content.ensureVisible(target)
+  }
+  function moveFieldAction(index, direction) {
+    if (!panel.loadedContent) return
+    const actions = [panel.loadedContent.editAction, panel.loadedContent.revealAction, panel.loadedContent.favoriteAction]
+    for (let step = 1; step <= actions.length; step++) {
+      const target = actions[(index + direction * step + actions.length) % actions.length]
+      if (target && target.enabled && target.visible) {
+        target.forceActiveFocus()
+        panel.loadedContent.ensureVisible(target)
+        return
+      }
+    }
   }
   function reviewRequest(id) { if (!service.running || !requests.includes(id)) return; if (screen !== "approval") previousScreen = screen; requestId = id; review = ({}); screen = "approval"; send({action: "review", id: id}) }
   function decideRequest(action) {
@@ -445,6 +478,9 @@ Panel {
       property alias unlockButton: unlockButton
       property alias passwordBackButton: passwordBackButton
       property alias fieldsBackButton: fieldsBackButton
+      property alias editAction: editAction
+      property alias revealAction: revealAction
+      property alias favoriteAction: favoriteAction
       property alias favoriteCancel: favoriteCancel
       property alias fieldRepeater: fieldRows
       property alias queryField: searchField
@@ -464,20 +500,6 @@ Panel {
       clip: true
       Keys.priority: Keys.BeforeItem
       Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
-      Keys.onUpPressed: function(event) {
-        if (root.screen !== "fields") { event.accepted = false; return }
-        const view = scroll.contentItem
-        if (view.contentY <= 0) { event.accepted = false; return }
-        view.contentY = Math.max(0, view.contentY - Math.max(Style.space(42), view.height * 0.8))
-        event.accepted = true
-      }
-      Keys.onDownPressed: function(event) {
-        if (root.screen !== "fields") { event.accepted = false; return }
-        const view = scroll.contentItem
-        if (view.contentY + view.height >= view.contentHeight) { event.accepted = false; return }
-        view.contentY = Math.min(view.contentHeight - view.height, view.contentY + Math.max(Style.space(42), view.height * 0.8))
-        event.accepted = true
-      }
       ColumnLayout {
         id: contentColumn
         width: scroll.availableWidth
@@ -643,6 +665,8 @@ Panel {
             }
             WideButton {
               id: fieldsBackButton
+              navigationList: "fields"
+              navigationIndex: 0
               visible: root.screen === "fields"
               text: strings.t("back")
               iconText: "󰁍"
@@ -707,15 +731,30 @@ Panel {
               required property var modelData
               required property int index
               Layout.fillWidth: true
+              activeFocusOnTab: true
+              Keys.onUpPressed: function(event) { root.moveList("fields", index + 1, -1); event.accepted = true }
+              Keys.onDownPressed: function(event) { root.moveList("fields", index + 1, 1); event.accepted = true }
+              Keys.onPressed: function(event) {
+                if (event.modifiers !== Qt.NoModifier) return
+                if (event.key === Qt.Key_C) {
+                  root.send({action: "copy", id: root.itemId, field: modelData.Name})
+                  event.accepted = true
+                } else if (event.key === Qt.Key_V && modelData.Protected) {
+                  root.toggleReveal(modelData)
+                  event.accepted = true
+                } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && modelData.Name.toLowerCase() === "url" && !modelData.Protected && /^https?:\/\//i.test(modelData.Value)) {
+                  Qt.openUrlExternally(modelData.Value)
+                  event.accepted = true
+                }
+              }
               RowLayout {
                 Layout.fillWidth: true
                 HoverHandler { id: fieldNameHover }
-                BodyText { text: modelData.Name; color: fieldNameHover.hovered ? Commons.Color.accent : Commons.Color.foreground; Layout.fillWidth: true }
+                BodyText { text: modelData.Name; color: fieldNameHover.hovered || fieldRow.activeFocus ? Commons.Color.accent : Commons.Color.foreground; Layout.fillWidth: true }
                 PanelActionButton {
                   iconText: "󰌷"
                   tooltipText: "Copy bypass://" + (fieldRow.modelData.group ? fieldRow.modelData.group + "/" : "") + root.itemTitle + "#" + fieldRow.modelData.Name
-                  focusable: true
-                  opacity: fieldNameHover.hovered ? 1 : 0
+                  opacity: fieldNameHover.hovered || fieldRow.activeFocus ? 1 : 0
                   onClicked: {
                     root.send({action: "copy-reference", id: root.itemId, field: modelData.Name})
                   }
@@ -726,7 +765,7 @@ Panel {
                 HoverHandler { id: fieldValueHover }
                 BodyText {
                   text: modelData.Protected ? (Object.prototype.hasOwnProperty.call(root.revealedValues, modelData.Name) ? root.revealedValues[modelData.Name] : "••••••••") : modelData.Value
-                  color: fieldValueHover.hovered ? Commons.Color.accent : Qt.darker(Commons.Color.foreground, 1.3)
+                  color: fieldValueHover.hovered || fieldRow.activeFocus ? Commons.Color.accent : Qt.darker(Commons.Color.foreground, 1.3)
                   wrapMode: modelData.Name === "Notes" ? Text.Wrap : Text.NoWrap
                   maximumLineCount: modelData.Name === "Notes" ? 5 : 1
                   elide: Text.ElideRight
@@ -735,18 +774,16 @@ Panel {
                 PanelActionButton {
                   visible: modelData.Protected
                   iconText: root.revealing && (root.revealingField === "" || root.revealingField === modelData.Name) ? "󰈉" : "󰈈"
-                  tooltipText: root.revealing && (root.revealingField === "" || root.revealingField === modelData.Name) ? strings.t("secret.hide") : strings.t("secret.reveal")
-                  focusable: true
-                  opacity: fieldValueHover.hovered ? 1 : 0
+                  tooltipText: root.revealing && (root.revealingField === "" || root.revealingField === modelData.Name) ? strings.t("secret.hide_key") : strings.t("secret.reveal_key")
+                  opacity: fieldValueHover.hovered || fieldRow.activeFocus ? 1 : 0
                   onClicked: {
                     root.toggleReveal(modelData)
                   }
                 }
                 PanelActionButton {
                   iconText: "󰆏"
-                  tooltipText: strings.t("copy.value")
-                  focusable: true
-                  opacity: fieldValueHover.hovered ? 1 : 0
+                  tooltipText: strings.t("copy.value_key")
+                  opacity: fieldValueHover.hovered || fieldRow.activeFocus ? 1 : 0
                   onClicked: {
                     root.send({action: "copy", id: root.itemId, field: modelData.Name})
                   }
@@ -757,20 +794,34 @@ Panel {
           RowLayout {
             Layout.fillWidth: true
             Layout.topMargin: Style.space(8)
-            PanelActionButton {
+            component FieldAction: PanelActionButton {
+              property int actionIndex: 0
+              focusable: true
+              Keys.onUpPressed: function(event) { root.moveList("fields", root.fields.length + 1 + actionIndex, -1); event.accepted = true }
+              Keys.onDownPressed: function(event) { root.moveList("fields", root.fields.length + 1 + actionIndex, 1); event.accepted = true }
+              Keys.onLeftPressed: function(event) { root.moveFieldAction(actionIndex, -1); event.accepted = true }
+              Keys.onRightPressed: function(event) { root.moveFieldAction(actionIndex, 1); event.accepted = true }
+            }
+            FieldAction {
+              id: editAction
+              actionIndex: 0
               iconText: "󰏫"
               tooltipText: strings.t("vault.edit")
               focusable: true
               onClicked: { editLauncher.running = true; root.close() }
             }
-            PanelActionButton {
+            FieldAction {
+              id: revealAction
+              actionIndex: 1
               iconText: root.revealing ? "󰈉" : "󰈈"
               tooltipText: root.revealing ? strings.t("secret.hide") : strings.t("secret.reveal")
               focusable: true
               enabled: root.fields.some(field => field.Protected)
               onClicked: root.toggleRevealAll()
             }
-            PanelActionButton {
+            FieldAction {
+              id: favoriteAction
+              actionIndex: 2
               iconText: root.itemFavorite ? "󰓏" : "󰓎"
               tooltipText: root.itemFavorite ? strings.t("vault.remove_favorite") : strings.t("vault.add_favorite")
               focusable: true
