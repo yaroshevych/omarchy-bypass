@@ -2,6 +2,8 @@
 
 Secrets manager in the Omarchy bar: open KeePass vaults, view your items, and review agent requests.
 
+![Bypass widget showing favorite vault items](preview.png)
+
 ## Agent interface
 
 Local agents can access secrets from KeePass vaults using `bypass run`. It injects approved secrets 
