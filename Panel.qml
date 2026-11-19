@@ -389,6 +389,9 @@ Panel {
       }
     }
   }
+  function approvalTargetLabel(target) {
+    return (target.Group ? target.Group + "/" : "") + target.Title + ": " + target.Field
+  }
   function reviewRequest(id) { if (!service.running || !requests.includes(id)) return; if (screen !== "approval") previousScreen = screen; requestId = id; review = ({}); screen = "approval"; send({action: "review", id: id}) }
   function decideRequest(action) {
     if (!service.running) { decisionError = strings.t("service.unavailable"); return }
@@ -901,7 +904,12 @@ Panel {
             PanelSectionHeader { text: strings.t("approval.requested_secrets"); Layout.fillWidth: true }
             Repeater {
               model: root.review.targets || []
-              BodyText { required property var modelData; text: modelData.Title + ": " + modelData.Field; Layout.fillWidth: true; wrapMode: Text.Wrap }
+              BodyText {
+                required property var modelData
+                text: root.approvalTargetLabel(modelData)
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+              }
             }
           }
           WideButton { text: strings.t("approval.approve"); enabled: (root.review.targets || []).length > 0; onClicked: root.decideRequest("approve") }

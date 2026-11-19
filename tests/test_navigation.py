@@ -74,10 +74,22 @@ QtObject {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("path passed", result.stderr)
 
+    def test_approval_identifies_group_for_duplicate_titles(self):
+        panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
+        start = panel.index("  function approvalTargetLabel(")
+        end = panel.index("\n  function reviewRequest(", start)
+        script = panel[start:end] + """
+const a = approvalTargetLabel({Group: "Passwords/Personal", Title: "Email", Field: "Password"});
+const b = approvalTargetLabel({Group: "Passwords/Work", Title: "Email", Field: "Password"});
+if (a !== "Passwords/Personal/Email: Password" || b !== "Passwords/Work/Email: Password" || a === b) throw Error("group missing");
+"""
+        result = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_password_and_item_navigation(self):
         panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
         start = panel.index("  function moveList(")
-        end = panel.index("\n  function reviewRequest(", start)
+        end = panel.index("\n  function approvalTargetLabel(", start)
         move_list = panel[start:end]
         qml = '''import QtQuick
 QtObject {
