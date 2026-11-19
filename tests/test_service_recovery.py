@@ -13,14 +13,15 @@ class ServiceRecoveryTest(unittest.TestCase):
         functions = panel[panel.index("  function handle("):panel.index("  function openItem(")]
         review = panel[panel.index("  function reviewRequest("):panel.index("  function decideRequest(")]
         script = r'''let screen = "approval", serviceReady = true, pendingPassword = "", vaultPath = "";
-let stoppingService = false, stopScreen = "recent";
+let stoppingService = false, stopScreen = "recent", reloadFailed = false;
+let searchGeneration = 0, showingAllItems = false, favoriteConsent = "", favoriteLossMessage = "";
 let requests = ["1"], requestId = "1", review = {targets:["secret"]}, previousScreen = "fields";
 let items = [1], fields = [1], itemQueries = [1], openSearchGeneration = 1;
 let itemId = "id", itemTitle = "title", itemGroup = "group", focusSearchOnResults = true;
 let errorText = "old", approvalError = "old", decisionError = "old", recent = ["/vault"];
 let opened = false, openedCount = 0, sent = [];
 const service = {running: false, write(line) { if (JSON.parse(line).action === "shutdown") this.running = false; }}, strings = {t: x => x};
-const panel = {loadedContent: {passwordField: {text: "secret"}}};
+const panel = {loadedContent: {passwordField: {text: "secret"}, queryField: {text: "query"}}};
 const searchTimer = {stop() {}}, revealTimer = {stop() {}};
 const root = {open() { openedCount++; }, reviewRequest(id) { reviewRequest(id); }};
 function clearReveal() {}
@@ -47,10 +48,16 @@ handle(JSON.stringify({action:"recent", recent:["/vault"]}));
 function searchItems() {}
 handle(JSON.stringify({action:"open"}));
 if (screen !== "items" || !service.running || recent[0] !== "/vault") throw Error("unlock did not finish");
+screen = "fields"; fields = [1]; itemId = "id"; itemTitle = "title";
+handle(JSON.stringify({action:"reloaded"}));
+if (screen !== "items" || fields.length || itemId || itemTitle || searchGeneration !== 1) throw Error("reload did not clear stale details");
 handle(JSON.stringify({action:"locked"}));
 if (service.running || !stoppingService) throw Error("lock did not stop service");
 serviceExited();
 if (screen !== "recent" || serviceReady || errorText) throw Error("lock did not return to recent");
+openVault("/vault"); unlockVault("master"); handle(JSON.stringify({action:"recent"}));
+handle(JSON.stringify({action:"reload-failed"})); serviceExited();
+if (screen !== "password" || errorText !== "vault.reload_failed") throw Error("reload failure not shown");
 openVault("/vault"); unlockVault("master"); service.running = false; serviceExited();
 if (screen !== "failed" || errorText !== "service.incompatible" || pendingPassword) throw Error("restart failure not shown");
 '''

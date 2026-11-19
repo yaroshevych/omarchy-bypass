@@ -25,6 +25,7 @@
   "vault.unlock": "Unlock",
   "vault.lock": "Lock",
   "vault.edit": "Edit",
+  "vault.reload_failed": "Vault changed and could not be reloaded. Unlock it again.",
   "vault.launch_failed": "Could not launch Bypass",
   "vault.add_favorite": "Add to favourites",
   "vault.remove_favorite": "Remove from favourites",

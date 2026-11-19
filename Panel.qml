@@ -40,6 +40,7 @@ Panel {
   property bool serviceReady: false
   property string pendingPassword: ""
   property bool stoppingService: false
+  property bool reloadFailed: false
   property string stopScreen: "recent"
   property string vaultPath: ""
   property string itemId: ""
@@ -163,6 +164,22 @@ Panel {
     let result
     try { result = JSON.parse(line) } catch (e) { errorText = strings.t("service.invalid_response"); return }
     if (stoppingService) return
+    if (result.action === "reload-failed") {
+      reloadFailed = true
+      stopService("password")
+      return
+    }
+    if (result.action === "reloaded") {
+      clearReveal()
+      fields = []; itemId = ""; itemTitle = ""; itemGroup = ""; favoriteConsent = ""; favoriteLossMessage = ""
+      if (screen === "approval") previousScreen = "items"
+      else if (screen === "fields" || screen === "favorite-confirm") screen = "items"
+      if (screen === "items" && panel.loadedContent) {
+        searchGeneration++; openSearchGeneration = -1
+        searchItems(showingAllItems ? "*" : panel.loadedContent.queryField.text)
+      }
+      return
+    }
     if (result.action === "add-favorite" || result.action === "remove-favorite") {
       favoritePending = false
       if (result.error) {
@@ -293,7 +310,8 @@ Panel {
     searchTimer.stop(); clearReveal()
     if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
     screen = expected ? stopScreen : wasReady ? "recent" : "failed"
-    if (!expected) errorText = wasReady ? "" : strings.t("service.incompatible")
+    if (reloadFailed) { errorText = strings.t("vault.reload_failed"); reloadFailed = false }
+    else if (!expected) errorText = wasReady ? "" : strings.t("service.incompatible")
   }
   function openItem(item) { itemId = item.ID; itemTitle = item.Title; itemFavorite = !!item.Favorite; send({action: "fields", id: item.ID}) }
   function escapeView() {
@@ -344,7 +362,7 @@ Panel {
     const showAllVisible = list === "items" && content.showAllButton.visible
     const count = list === "recent" ? filteredRecent.length : list === "password" ? 3 : list === "fields" ? fields.length + 1 : items.length + (showAllVisible ? 2 : 1)
     let next = index + direction
-    if (list === "items" && index < 0) next = direction > 0 ? 0 : count - 1
+    if (list === "items" && index < 0) next = direction > 0 ? 0 : count - 2
     else next = (next + count) % count
     if (list === "recent" && count === 0) { content.recentFilter.forceActiveFocus(); return }
     if (list === "items" && count === 1) { content.queryField.forceActiveFocus(); return }

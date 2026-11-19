@@ -114,12 +114,14 @@ QtObject {
 ''' + move_list + '''
  Component.onCompleted: {
   moveList("items", -1, 1); if (last !== "first-item") throw new Error("search down")
+  moveList("items", -1, -1); if (last !== "second-item") throw new Error("search up wraps to last item")
   moveList("items", 0, 1); if (last !== "second-item") throw new Error("item down")
   moveList("items", 1, -1); if (last !== "first-item") throw new Error("item up")
   moveList("items", 0, -1); if (last !== "search") throw new Error("search up")
   moveList("items", 1, 1); if (last !== "search") throw new Error("hidden show all skipped")
   panel.loadedContent.showAllButton.visible = true
   moveList("items", 1, 1); if (last !== "show-all") throw new Error("visible show all")
+  moveList("items", -1, -1); if (last !== "show-all") throw new Error("search up wraps to show all")
   moveList("password", 0, 1); if (last !== "password") throw new Error("back down")
   moveList("password", 1, 1); if (last !== "unlock") throw new Error("password down")
   moveList("password", 2, -1); if (last !== "password") throw new Error("unlock up")
