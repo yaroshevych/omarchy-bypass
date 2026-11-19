@@ -28,6 +28,14 @@ For encryption and vault operations, Bypass relies on mature `gokeepasslib` libr
 `bypass run` is designed to inject secrets into commands without including them in the agent's context. It does
 not prevent executed commands from exposing secrets, for example logging secrets by mistake.
 
+## Requirements
+
+The widget requires Omarchy and Bypass. Opening the full app uses `hyprctl`,
+`jq`, and `omarchy-launch-tui`. Clipboard actions use Wayland clipboard tools.
+The optional Bypass installer requires Bash and `curl`; menu registration uses
+Python 3. See the [Bypass license](https://github.com/yaroshevych/bypass/blob/main/LICENSE)
+and this plugin's [license](LICENSE).
+
 ## Install
 
 ```sh
