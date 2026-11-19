@@ -222,6 +222,12 @@ Panel {
       return
     }
     if (result.action === "recent" && !result.error) {
+      if (!result.sensitiveClipboard) {
+        pendingPassword = ""
+        errorText = strings.t("service.clipboard_upgrade")
+        stopService("failed")
+        return
+      }
       serviceReady = true
       if (screen === "checking" && service.running) {
         const password = pendingPassword

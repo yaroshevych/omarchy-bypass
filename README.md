@@ -28,6 +28,12 @@ For encryption and vault operations, Bypass relies on mature `gokeepasslib` libr
 `bypass run` is designed to inject secrets into commands without including them in the agent's context. It does
 not prevent executed commands from exposing secrets, for example logging secrets by mistake.
 
+Bypass marks clipboard copies as sensitive so Omarchy's clipboard history skips
+them. This requires a Bypass version with sensitive clipboard support and
+`wl-copy` with the `--sensitive` option. Clipboard managers that ignore the
+sensitive marker may still retain copied data. This does not remove older
+clipboard history entries.
+
 ## Requirements
 
 The widget requires Omarchy and Bypass. Opening the full app uses `hyprctl`,
