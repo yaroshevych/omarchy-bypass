@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 spec = importlib.util.spec_from_file_location('session_guard', Path(__file__).resolve().parents[1] / 'check-running-bypass.py')
@@ -14,6 +15,22 @@ spec.loader.exec_module(guard)
 
 
 class SessionGuardTest(unittest.TestCase):
+    def test_foreign_owned_ipc_directory_is_ignored_even_if_inaccessible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'run.sock'
+            foreign = mock.Mock(st_uid=os.getuid() + 1, st_mode=0)
+            with mock.patch.object(Path, 'lstat', return_value=foreign), \
+                    mock.patch.object(guard.socket, 'socket') as make_socket:
+                guard.check_socket(path, os.stat('/proc/self/exe'), os.getuid())
+                make_socket.assert_not_called()
+
+    def test_owned_invalid_ipc_directory_still_blocks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            entry = Path(directory) / 'not-a-directory'
+            entry.touch()
+            with self.assertRaises(guard.UnsafeSession):
+                guard.check_socket(entry / 'run.sock', os.stat('/proc/self/exe'), os.getuid())
+
     def test_old_tui_is_blocked_but_current_and_short_commands_are_allowed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 import socket
+import stat
 import struct
 import sys
 
@@ -20,6 +21,18 @@ def same_executable(path, expected):
 
 
 def check_socket(path, expected, uid, proc_root=Path('/proc')):
+    # Bypass only creates IPC servers in real directories owned by this user.
+    # Other users can create matching names in /tmp, but cannot host our server.
+    try:
+        directory = path.parent.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise UnsafeSession from exc
+    if directory.st_uid != uid:
+        return
+    if not stat.S_ISDIR(directory.st_mode):
+        raise UnsafeSession
     # SO_PEERCRED identifies the actual server, including a renamed executable.
     conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     conn.settimeout(0.5)
