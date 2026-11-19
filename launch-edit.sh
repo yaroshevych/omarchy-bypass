@@ -10,4 +10,8 @@ if [ -n "$window" ]; then
   esac
   exec hyprctl dispatch "hl.dsp.focus({window = hl.get_window(\"address:$address\")})"
 fi
-omarchy-launch-tui "$1" "$2" </dev/null >/dev/null 2>&1 &
+if [ -n "$2" ]; then
+  omarchy-launch-tui "$1" "$2" </dev/null >/dev/null 2>&1 &
+else
+  omarchy-launch-tui "$1" </dev/null >/dev/null 2>&1 &
+fi

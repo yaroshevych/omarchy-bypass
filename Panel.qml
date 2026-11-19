@@ -396,6 +396,13 @@ Panel {
     command: ["python3", decodeURIComponent(Qt.resolvedUrl("register-menu.py").toString().replace(/^file:\/\//, ""))]
   }
   Process {
+    id: bypassLauncher
+    command: ["sh", decodeURIComponent(Qt.resolvedUrl("launch-edit.sh").toString().replace(/^file:\/\//, "")), root.backendPath]
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+    }
+  }
+  Process {
     id: editLauncher
     command: ["sh", decodeURIComponent(Qt.resolvedUrl("launch-edit.sh").toString().replace(/^file:\/\//, "")), root.backendPath, root.vaultPath]
     onExited: function(exitCode, exitStatus) {
@@ -496,6 +503,17 @@ Panel {
             opacity: root.requests.length > 0 ? 1 : 0.55
             text: strings.t("approval.requests") + " (" + root.requests.length + ")"
             onClicked: root.reviewRequest(root.requests[0])
+          }
+          WideButton {
+            Layout.fillWidth: false
+            implicitHeight: Style.space(32)
+            Layout.minimumHeight: Style.space(32)
+            Layout.maximumHeight: Style.space(32)
+            iconText: "󰆍"
+            borderSpec: Commons.Border.flat(Commons.Color.foreground, 1)
+            tooltipText: strings.t("app.open")
+            enabled: root.backendPath !== ""
+            onClicked: { bypassLauncher.running = true; root.close() }
           }
         }
         BodyText { visible: root.errorText !== ""; text: root.errorText; color: Commons.Color.urgent; wrapMode: Text.Wrap; Layout.fillWidth: true }

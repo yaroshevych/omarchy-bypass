@@ -59,6 +59,15 @@ To uninstall Bypass installed by the widget, run `rm ~/.local/bin/bypass`.
 
 ## Development
 
+Reinstall this checkout into the local shell after changes:
+
+```sh
+./reinstall.sh
+```
+
+The script validates the plugin, copies and verifies its files, and restarts the
+Omarchy shell so it loads the updated QML.
+
 Validate on an Omarchy machine:
 
 ```sh

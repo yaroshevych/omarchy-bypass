@@ -10,6 +10,7 @@
   "install.cancel": "Cancel",
   "install.progress": "Installing Bypass…",
   "install.failed": "Installation failed. Check your connection and try again.",
+  "app.open": "Full app",
   "vault.open": "Open vault",
   "vault.open_button": "Open",
   "vault.subtitle": "SECRETS MANAGER",
