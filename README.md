@@ -38,8 +38,8 @@ clipboard history entries.
 
 The widget requires Omarchy and Bypass. Opening the full app uses `hyprctl`,
 `jq`, and `omarchy-launch-tui`. Clipboard actions use Wayland clipboard tools.
-The optional Bypass installer requires Bash and `curl`; menu registration uses
-Python 3. See the [Bypass license](https://github.com/yaroshevych/bypass/blob/main/LICENSE)
+The optional Bypass installer requires `curl`, `sha256sum`, and `tar`;
+menu registration uses Python 3. See the [Bypass license](https://github.com/yaroshevych/bypass/blob/main/LICENSE)
 and this plugin's [license](LICENSE).
 
 ## Install
@@ -57,8 +57,10 @@ omarchy plugin add https://github.com/yaroshevych/omarchy-bypass.git --enable
 ```
 
 Open the Bypass icon in the bar. If Bypass is not installed, the widget offers to
-run the official installer. After installation, it also adds Bypass to the
-Omarchy menu if an entry named `bypass` does not already exist.
+install Bypass 0.3.4. The installer downloads the pinned release archive and
+verifies it against the checksum in this plugin before installing it. After
+installation, it adds Bypass to the Omarchy menu if an entry named `bypass`
+does not already exist.
 
 One widget instance is active at a time. If Omarchy creates the bar on multiple
 monitors, the widget appears on the first available bar.

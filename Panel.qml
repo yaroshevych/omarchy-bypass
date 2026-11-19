@@ -438,7 +438,7 @@ Panel {
   }
   Process {
     id: installer
-    command: ["bash", "-o", "pipefail", "-c", "curl -fsSL https://raw.githubusercontent.com/yaroshevych/bypass/main/install.sh | bash"]
+    command: ["sh", decodeURIComponent(Qt.resolvedUrl("install-bypass.sh").toString().replace(/^file:\/\//, ""))]
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0) {
         registerMenu.running = true

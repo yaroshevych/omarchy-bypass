@@ -7,7 +7,7 @@ plugin_dir="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/bypass.widget"
 
 omarchy plugin validate "$source_dir"
 mkdir -p "$plugin_dir/i18n"
-for file in Panel.qml WidgetCoordinator.qml qmldir manifest.json launch-edit.sh register-menu.py LICENSE; do
+for file in Panel.qml WidgetCoordinator.qml qmldir manifest.json launch-edit.sh install-bypass.sh register-menu.py LICENSE; do
   install -m 644 "$source_dir/$file" "$plugin_dir/$file"
   cmp -s "$source_dir/$file" "$plugin_dir/$file"
 done

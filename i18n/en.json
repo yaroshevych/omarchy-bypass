@@ -6,7 +6,7 @@
   "service.checking": "Checking Bypass…",
   "service.clipboard_upgrade": "Update Bypass to use secure clipboard copying, then retry.",
   "service.retry": "Retry",
-  "install.prompt": "Bypass is required. Install it from the official Bypass GitHub installer? This downloads and runs the installer and installs Bypass in ~/.local/bin.",
+  "install.prompt": "Bypass is required. Install verified Bypass 0.3.4 in ~/.local/bin and add a Bypass menu entry if one does not already exist?",
   "install.button": "Install Bypass",
   "install.cancel": "Cancel",
   "install.progress": "Installing Bypass…",
