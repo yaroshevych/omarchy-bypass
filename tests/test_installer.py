@@ -12,8 +12,8 @@ class InstallerTest(unittest.TestCase):
     def test_pinned_download_and_checksum_failure(self):
         source = (Path(__file__).resolve().parents[1] / "install-bypass.sh").read_text()
         expected = {
-            "x86_64": "4cbd956a501f520a0dad297fecad626e47089b419bd3fcb5f951398d86f51615",
-            "aarch64": "858dd72b3d796e249c3238ad0da5039a27a762f9c1b882f558306fe49b3006f0",
+            "x86_64": "54e72fa2b67680c7a343dc47d8a0d2448506cab676381e00cfe2587dd79ab27a",
+            "aarch64": "16b2531b2fd23bc128781c76b42e38cb38fa068dcae99d35e4ae0976f3659cfe",
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

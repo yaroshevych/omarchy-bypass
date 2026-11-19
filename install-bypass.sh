@@ -2,15 +2,15 @@
 # Install the reviewed Bypass release after verifying its pinned archive hash.
 set -eu
 
-version=0.3.4
+version=0.3.5
 case "$(uname -m)" in
   x86_64|amd64)
     arch=amd64
-    expected=4cbd956a501f520a0dad297fecad626e47089b419bd3fcb5f951398d86f51615
+    expected=54e72fa2b67680c7a343dc47d8a0d2448506cab676381e00cfe2587dd79ab27a
     ;;
   aarch64|arm64)
     arch=arm64
-    expected=858dd72b3d796e249c3238ad0da5039a27a762f9c1b882f558306fe49b3006f0
+    expected=16b2531b2fd23bc128781c76b42e38cb38fa068dcae99d35e4ae0976f3659cfe
     ;;
   *) echo 'Unsupported CPU architecture.' >&2; exit 1 ;;
 esac

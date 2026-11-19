@@ -57,7 +57,7 @@ omarchy plugin add https://github.com/yaroshevych/omarchy-bypass.git --enable
 ```
 
 Open the Bypass icon in the bar. If Bypass is not installed, the widget offers to
-install Bypass 0.3.4. The installer downloads the pinned release archive and
+install Bypass 0.3.5. The installer downloads the pinned release archive and
 verifies it against the checksum in this plugin before installing it. After
 installation, it adds Bypass to the Omarchy menu if an entry named `bypass`
 does not already exist.
