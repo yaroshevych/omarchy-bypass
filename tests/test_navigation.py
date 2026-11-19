@@ -74,6 +74,17 @@ QtObject {
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("path passed", result.stderr)
 
+    def test_minimum_backend_version(self):
+        panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
+        start = panel.index("  function supportedBackendVersion(")
+        end = panel.index("\n  function approvalTargetLabel(", start)
+        script = panel[start:end] + """
+for (const value of ["bypass 0.3.5", "bypass 0.3.6", "bypass 0.4.0", "bypass 1.0.0"]) if (!supportedBackendVersion(value)) throw Error("rejected " + value);
+for (const value of ["bypass 0.3.4", "bypass 0.2.99", "bypass dev", "bypass 0.3.5-rc1", "garbage"]) if (supportedBackendVersion(value)) throw Error("accepted " + value);
+"""
+        result = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_approval_identifies_group_for_duplicate_titles(self):
         panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
         start = panel.index("  function approvalTargetLabel(")
@@ -89,7 +100,7 @@ if (a !== "Passwords/Personal/Email: Password" || b !== "Passwords/Work/Email: P
     def test_password_and_item_navigation(self):
         panel = (Path(__file__).resolve().parents[1] / "Panel.qml").read_text()
         start = panel.index("  function moveList(")
-        end = panel.index("\n  function approvalTargetLabel(", start)
+        end = panel.index("\n  function supportedBackendVersion(", start)
         move_list = panel[start:end]
         qml = '''import QtQuick
 QtObject {

@@ -4,6 +4,7 @@
   "service.stopped": "Bypass service stopped",
   "service.incompatible": "Bypass could not start its widget service. Install a compatible Bypass release, then retry.",
   "service.checking": "Checking Bypass…",
+  "service.version_upgrade": "Update Bypass to version 0.3.5 or later, then retry.",
   "service.clipboard_upgrade": "Update Bypass to use secure clipboard copying, then retry.",
   "service.retry": "Retry",
   "install.prompt": "Bypass is required. Install verified Bypass 0.3.5 in ~/.local/bin and add a Bypass menu entry if one does not already exist?",

@@ -36,7 +36,7 @@ clipboard history entries.
 
 ## Requirements
 
-The widget requires Omarchy and Bypass. Opening the full app uses `hyprctl`,
+The widget requires Omarchy and Bypass 0.3.5 or later. Opening the full app uses `hyprctl`,
 `jq`, and `omarchy-launch-tui`. Clipboard actions use Wayland clipboard tools.
 The optional Bypass installer requires `curl`, `sha256sum`, and `tar`;
 menu registration uses Python 3. See the [Bypass license](https://github.com/yaroshevych/bypass/blob/main/LICENSE)

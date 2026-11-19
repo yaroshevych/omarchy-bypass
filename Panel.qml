@@ -23,6 +23,7 @@ Panel {
   Component.onCompleted: Plugin.WidgetCoordinator.attach(root)
   Component.onDestruction: {
     findBackend.running = false
+    checkBackendVersion.running = false
     recentLoader.running = false
     installer.running = false
     service.running = false
@@ -37,6 +38,7 @@ Panel {
   }
   property string screen: "checking"
   property string backendPath: ""
+  property string backendVersion: ""
   property bool serviceReady: false
   property string pendingPassword: ""
   property bool stoppingService: false
@@ -395,6 +397,12 @@ Panel {
       }
     }
   }
+  function supportedBackendVersion(value) {
+    const match = /^bypass ([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$/.exec(value.trim())
+    if (!match) return false
+    const major = Number(match[1]), minor = Number(match[2]), patch = Number(match[3])
+    return major > 0 || minor > 3 || (minor === 3 && patch >= 5)
+  }
   function approvalTargetLabel(target) {
     return (target.Group ? target.Group + "/" : "") + target.Title + ": " + target.Field
   }
@@ -418,9 +426,23 @@ Panel {
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0 && root.backendPath !== "") {
         root.screen = "checking"
-        recentLoader.running = true
+        root.backendVersion = ""
+        checkBackendVersion.running = true
       } else {
         root.screen = "missing"
+      }
+    }
+  }
+  Process {
+    id: checkBackendVersion
+    command: [root.backendPath, "--version"]
+    stdout: SplitParser { onRead: data => root.backendVersion = data.trim() }
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode === 0 && root.supportedBackendVersion(root.backendVersion)) {
+        recentLoader.running = true
+      } else {
+        root.errorText = strings.t("service.version_upgrade")
+        root.screen = "failed"
       }
     }
   }
@@ -561,7 +583,7 @@ Panel {
             iconText: "󰆍"
             borderSpec: Commons.Border.flat(Commons.Color.foreground, 1)
             tooltipText: strings.t("app.open")
-            enabled: root.backendPath !== ""
+            enabled: root.backendPath !== "" && root.screen !== "failed" && root.screen !== "checking"
             onClicked: { bypassLauncher.running = true; root.close() }
           }
         }
