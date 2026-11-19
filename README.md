@@ -34,6 +34,10 @@ them. This requires a Bypass version with sensitive clipboard support and
 sensitive marker may still retain copied data. This does not remove older
 clipboard history entries.
 
+After Bypass is updated, close any older Bypass terminal to clear its session
+approvals. The widget checks for older or unverifiable running sessions before
+unlocking or opening the full app and asks you to close them.
+
 ## Requirements
 
 The widget requires Omarchy and Bypass 0.3.5 or later. Opening the full app uses `hyprctl`,

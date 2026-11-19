@@ -24,6 +24,7 @@ Panel {
   Component.onDestruction: {
     findBackend.running = false
     checkBackendVersion.running = false
+    sessionGuard.running = false
     recentLoader.running = false
     installer.running = false
     service.running = false
@@ -39,6 +40,7 @@ Panel {
   property string screen: "checking"
   property string backendPath: ""
   property string backendVersion: ""
+  property string sessionCheckAction: ""
   property bool serviceReady: false
   property string pendingPassword: ""
   property bool stoppingService: false
@@ -109,6 +111,7 @@ Panel {
       Qt.callLater(function() { if (root.opened && root.screen === "recent") panel.loadedContent.recentFilter.forceActiveFocus() })
     } else {
       if (panel.loadedContent) panel.loadedContent.passwordField.text = ""
+      cancelPendingUnlock()
       if (screen === "password" || (screen === "checking" && service.running)) stopService("recent")
       fields = []
       clearReveal()
@@ -292,7 +295,35 @@ Panel {
   }
   function unlockVault(password) {
     if (service.running || stoppingService) return
-    errorText = ""; pendingPassword = password; screen = "checking"; service.running = true
+    errorText = ""; pendingPassword = password; screen = "checking"
+    beginSessionCheck("unlock")
+  }
+  function cancelPendingUnlock() {
+    if (screen === "checking" && sessionCheckAction === "unlock") {
+      pendingPassword = ""; sessionCheckAction = ""; screen = "password"
+    }
+  }
+  function beginSessionCheck(action) {
+    if (action) sessionCheckAction = action
+    if (!sessionGuard.running) sessionGuard.running = true
+  }
+  function completeSessionCheck(exitCode) {
+    const action = sessionCheckAction
+    sessionCheckAction = ""
+    if (!isOwner) return
+    if (exitCode !== 0) {
+      pendingPassword = ""
+      errorText = strings.t("service.old_session")
+      fields = []; clearReveal()
+      if (service.running) stopService("blocked")
+      else screen = "blocked"
+      return
+    }
+    if (action === "unlock" && screen === "checking") {
+      service.running = true
+    } else if (action === "startup" || screen === "blocked") {
+      errorText = ""; screen = "checking"; recentLoader.running = true
+    }
   }
   function stopService(nextScreen) {
     pendingPassword = ""
@@ -439,12 +470,23 @@ Panel {
     stdout: SplitParser { onRead: data => root.backendVersion = data.trim() }
     onExited: function(exitCode, exitStatus) {
       if (exitCode === 0 && root.supportedBackendVersion(root.backendVersion)) {
-        recentLoader.running = true
+        root.beginSessionCheck("startup")
       } else {
         root.errorText = strings.t("service.version_upgrade")
         root.screen = "failed"
       }
     }
+  }
+  Timer {
+    interval: 2000
+    repeat: true
+    running: root.isOwner && root.backendPath !== "" && root.supportedBackendVersion(root.backendVersion)
+    onTriggered: root.beginSessionCheck("")
+  }
+  Process {
+    id: sessionGuard
+    command: ["python3", decodeURIComponent(Qt.resolvedUrl("check-running-bypass.py").toString().replace(/^file:\/\//, "")), root.backendPath]
+    onExited: function(exitCode, exitStatus) { root.completeSessionCheck(exitStatus === 0 ? exitCode : 42) }
   }
   Process {
     id: recentLoader
@@ -481,14 +523,18 @@ Panel {
     id: bypassLauncher
     command: ["sh", decodeURIComponent(Qt.resolvedUrl("launch-edit.sh").toString().replace(/^file:\/\//, "")), root.backendPath]
     onExited: function(exitCode, exitStatus) {
-      if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+      if (exitCode === 42) root.completeSessionCheck(42)
+      else if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+      else root.close()
     }
   }
   Process {
     id: editLauncher
     command: ["sh", decodeURIComponent(Qt.resolvedUrl("launch-edit.sh").toString().replace(/^file:\/\//, "")), root.backendPath, root.vaultPath]
     onExited: function(exitCode, exitStatus) {
-      if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+      if (exitCode === 42) root.completeSessionCheck(42)
+      else if (exitCode !== 0) root.errorText = strings.t("vault.launch_failed")
+      else root.close()
     }
   }
   Process {
@@ -583,14 +629,14 @@ Panel {
             iconText: "󰆍"
             borderSpec: Commons.Border.flat(Commons.Color.foreground, 1)
             tooltipText: strings.t("app.open")
-            enabled: root.backendPath !== "" && root.screen !== "failed" && root.screen !== "checking"
-            onClicked: { bypassLauncher.running = true; root.close() }
+            enabled: root.backendPath !== "" && root.screen !== "failed" && root.screen !== "checking" && root.screen !== "blocked"
+            onClicked: bypassLauncher.running = true
           }
         }
         BodyText { visible: root.errorText !== ""; text: root.errorText; color: Commons.Color.urgent; wrapMode: Text.Wrap; Layout.fillWidth: true }
         BodyText { visible: root.approvalError !== ""; text: root.approvalError; color: Commons.Color.urgent; wrapMode: Text.Wrap; Layout.fillWidth: true }
         ColumnLayout {
-          visible: root.screen === "missing" || root.screen === "installing" || root.screen === "failed" || root.screen === "checking"
+          visible: root.screen === "missing" || root.screen === "installing" || root.screen === "failed" || root.screen === "checking" || root.screen === "blocked"
           Layout.fillWidth: true
           BodyText {
             Layout.fillWidth: true
@@ -608,9 +654,12 @@ Panel {
             onClicked: root.close()
           }
           WideButton {
-            visible: root.screen === "failed"
+            visible: root.screen === "failed" || root.screen === "blocked"
             text: strings.t("service.retry")
-            onClicked: { root.errorText = ""; root.backendPath = ""; root.screen = "checking"; findBackend.running = true }
+            onClicked: {
+              if (root.screen === "blocked") root.beginSessionCheck("")
+              else { root.errorText = ""; root.backendPath = ""; root.screen = "checking"; findBackend.running = true }
+            }
           }
         }
         ColumnLayout {
@@ -857,7 +906,7 @@ Panel {
               iconText: "󰏫"
               tooltipText: strings.t("vault.edit")
               focusable: true
-              onClicked: { editLauncher.running = true; root.close() }
+              onClicked: editLauncher.running = true
             }
             FieldAction {
               id: revealAction

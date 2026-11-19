@@ -1,7 +1,10 @@
 #!/bin/sh
 # Focus an existing Bypass terminal, or launch it with the selected vault.
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 42
+python3 "$script_dir/check-running-bypass.py" "$1" || exit 42
 window=$(hyprctl clients -j | jq -r '[.[] | select(.class == "org.omarchy.bypass") | select(.address | test("^0x[0-9a-fA-F]+$")) | [.address, (.workspace.id | tostring)]][0] | if . then @tsv else empty end')
 if [ -n "$window" ]; then
+  python3 "$script_dir/check-running-bypass.py" "$1" || exit 42
   address=${window%%	*}
   workspace=${window#*	}
   case "$workspace" in
