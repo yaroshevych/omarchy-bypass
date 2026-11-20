@@ -4,8 +4,8 @@
   "name": "Bypass",
   "version": "0.1.0",
   "author": "Bypass",
-  "description": "Bypass secrets manager: view your KeePass vault, copy passwords, and review AI agent security requests from the Omarchy bar.",
+  "description": "Bypass secrets manager: view your KeePass vault, copy passwords, and review AI agent secrets requests from the Omarchy bar.",
   "kinds": ["bar-widget"],
   "entryPoints": {"barWidget": "Panel.qml"},
-  "barWidget": {"displayName": "Bypass", "description": "Vault and approval requests", "category": "Security", "allowMultiple": false}
+  "barWidget": {"displayName": "Bypass", "description": "KeePass vault and approval requests", "category": "Security", "allowMultiple": false}
 }
