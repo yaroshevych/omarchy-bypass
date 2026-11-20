@@ -564,12 +564,12 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: !panel.loadedContent ? null : root.screen === "password" ? panel.loadedContent.passwordField : root.screen === "items" ? panel.loadedContent.queryField : root.screen === "recent" ? panel.loadedContent.recentFilter : panel.loadedContent
+    focusTarget: !panel.loadedContent ? null : root.screen === "password" ? panel.loadedContent.passwordField.item : root.screen === "items" ? panel.loadedContent.queryField.item : root.screen === "recent" ? panel.loadedContent.recentFilter.item : panel.loadedContent
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(panel.loadedContentHeight, Style.space(560))
     content: ScrollView {
       id: scroll
-      property alias passwordField: password
+      property alias passwordField: passwordLoader
       property alias unlockButton: unlockButton
       property alias passwordBackButton: passwordBackButton
       property alias fieldsBackButton: fieldsBackButton
@@ -670,16 +670,24 @@ Panel {
           RowLayout {
             Layout.fillWidth: true
             spacing: Style.space(8)
-            TextField {
+            Loader {
               id: recentFilter
-              placeholderText: strings.t("search")
+              active: root.opened
+              property string text: ""
+              function forceActiveFocus() { if (item) item.forceActiveFocus() }
+              onTextChanged: if (item && item.text !== text) item.text = text
               Layout.fillWidth: true
-              Layout.minimumWidth: 0
-              Layout.maximumHeight: implicitHeight
-              onTextChanged: root.recentQuery = text
-              Keys.onDownPressed: function(event) { root.moveList("recent", -1, 1); event.accepted = true }
-              Keys.onUpPressed: function(event) { event.accepted = true }
-              onAccepted: if (root.filteredRecent.length > 0) root.openVault(root.filteredRecent[0])
+              sourceComponent: TextField {
+                text: recentFilter.text
+                placeholderText: strings.t("search")
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.maximumHeight: implicitHeight
+                onTextChanged: { recentFilter.text = text; root.recentQuery = text }
+                Keys.onDownPressed: function(event) { root.moveList("recent", -1, 1); event.accepted = true }
+                Keys.onUpPressed: function(event) { event.accepted = true }
+                onAccepted: if (root.filteredRecent.length > 0) root.openVault(root.filteredRecent[0])
+              }
             }
             Ui.Button {
               text: strings.t("vault.open_button")
@@ -725,20 +733,29 @@ Panel {
             implicitHeight: searchField.implicitHeight
             Layout.minimumHeight: searchField.implicitHeight
             Layout.maximumHeight: searchField.implicitHeight
-            onClicked: { password.text = ""; root.stopService("recent") }
+            onClicked: { passwordLoader.text = ""; root.stopService("recent") }
           }
           BodyText { text: root.displayPath(root.vaultPath); elide: Text.ElideMiddle; Layout.fillWidth: true }
-          TextField {
-            id: password
-            placeholderText: strings.t("vault.password")
-            password: true
+          Loader {
+            id: passwordLoader
+            active: root.opened
+            property string text: ""
+            function forceActiveFocus() { if (item) item.forceActiveFocus() }
+            onTextChanged: if (item && item.text !== text) item.text = text
             Layout.fillWidth: true
-            Keys.onDownPressed: function(event) { root.moveList("password", 1, 1); event.accepted = true }
-            Keys.onUpPressed: function(event) { root.moveList("password", 1, -1); event.accepted = true }
-            Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
-            onAccepted: { root.unlockVault(text); text = "" }
+            sourceComponent: TextField {
+              text: passwordLoader.text
+              placeholderText: strings.t("vault.password")
+              password: true
+              onTextChanged: passwordLoader.text = text
+              Layout.fillWidth: true
+              Keys.onDownPressed: function(event) { root.moveList("password", 1, 1); event.accepted = true }
+              Keys.onUpPressed: function(event) { root.moveList("password", 1, -1); event.accepted = true }
+              Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
+              onAccepted: { root.unlockVault(text); text = "" }
+            }
           }
-          WideButton { id: unlockButton; text: strings.t("vault.unlock"); navigationList: "password"; navigationIndex: 2; onClicked: { root.unlockVault(password.text); password.text = "" } }
+          WideButton { id: unlockButton; text: strings.t("vault.unlock"); navigationList: "password"; navigationIndex: 2; onClicked: { root.unlockVault(passwordLoader.text); passwordLoader.text = "" } }
         }
         ColumnLayout {
           visible: root.screen === "items" || root.screen === "fields"
@@ -748,18 +765,26 @@ Panel {
           RowLayout {
             Layout.fillWidth: true
             spacing: Style.space(8)
-            TextField {
+            Loader {
               id: searchField
               visible: root.screen === "items"
-              placeholderText: strings.t("search")
+              active: root.opened
+              property string text: ""
+              function forceActiveFocus() { if (item) item.forceActiveFocus() }
+              onTextChanged: if (item && item.text !== text) item.text = text
               Layout.fillWidth: true
-              Layout.minimumWidth: 0
-              Layout.maximumHeight: implicitHeight
-              onTextChanged: { root.showingAllItems = false; root.searchGeneration++; root.openSearchGeneration = -1; searchTimer.restart() }
-              Keys.onDownPressed: function(event) { root.moveList("items", -1, 1); event.accepted = true }
-              Keys.onUpPressed: function(event) { root.moveList("items", -1, -1); event.accepted = true }
-              Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
-              onAccepted: root.acceptSearch()
+              sourceComponent: TextField {
+                text: searchField.text
+                placeholderText: strings.t("search")
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.maximumHeight: implicitHeight
+                onTextChanged: { if (searchField.text === text) return; searchField.text = text; root.showingAllItems = false; root.searchGeneration++; root.openSearchGeneration = -1; searchTimer.restart() }
+                Keys.onDownPressed: function(event) { root.moveList("items", -1, 1); event.accepted = true }
+                Keys.onUpPressed: function(event) { root.moveList("items", -1, -1); event.accepted = true }
+                Keys.onEscapePressed: function(event) { event.accepted = root.escapeView() }
+                onAccepted: root.acceptSearch()
+              }
             }
             WideButton {
               id: fieldsBackButton
@@ -968,7 +993,7 @@ Panel {
           }
           PanelSectionHeader { text: strings.t("approval.title"); Layout.fillWidth: true }
           BodyText { text: strings.t("approval.agent").arg(root.review.agent || strings.t("approval.unknown")); Layout.fillWidth: true; wrapMode: Text.Wrap }
-          BodyText { text: strings.t("approval.command").arg((root.review.command || []).join(" ")); Layout.fillWidth: true; wrapMode: Text.Wrap }
+          BodyText { text: strings.t("approval.command").arg(JSON.stringify(root.review.command || [])); Layout.fillWidth: true; wrapMode: Text.Wrap }
           BodyText { text: strings.t("approval.directory").arg(root.review.directory || ""); Layout.fillWidth: true; wrapMode: Text.Wrap }
           BodyText { text: strings.t("approval.identity_note"); wrapMode: Text.Wrap; Layout.fillWidth: true }
           ColumnLayout {
